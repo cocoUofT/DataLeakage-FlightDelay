@@ -1,6 +1,7 @@
 
 # Import clean data
 pilot <- readRDS("data/processed/january_pilot_split.rds")
+source("scripts/metrics.R")
 
 train <- pilot$train
 validation <- pilot$validation
@@ -21,23 +22,6 @@ validation$prob_clean <- predict(logistic_clean, newdata = validation,
 
 validation$prob_leakage <- predict(logistic_leakage, newdata = validation,
                                    type = "response")
-
-# Calculate average precision (AP)
-average_precision <- function(actual, probability) {
-  stopifnot(length(actual) == length(probability), all(actual %in% c(0, 1)),
-            all(is.finite(probability)), all(probability >= 0 & probability <= 1),
-            sum(actual == 1) > 0)
-  # Sort flights from highest to lowest predicted risk
-  index <- order(probability, decreasing = TRUE)
-  actual <- actual[index]
-  probability <- probability[index]
-  # Evaluate at the end of each group of tied probabilities
-  endpoints <- cumsum(rle(probability)$lengths)
-  true_positives <- cumsum(actual == 1)[endpoints]
-  precision <- true_positives / endpoints
-  recall <- true_positives / sum(actual == 1)
-  
-  sum(diff(c(0, recall)) * precision)}
 
 # Compare AP
 
@@ -66,5 +50,3 @@ write.csv(validation_results, "results/pilot/logistic_validation_AP.csv",
 
 saveRDS(list(clean = logistic_clean, leakage = logistic_leakage),
         "results/pilot/logistic_models.rds")
-
-
