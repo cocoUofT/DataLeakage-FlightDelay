@@ -45,7 +45,7 @@ Use two models and two feature conditions:
 
 For each paired feature comparison, use identical eligible flights, training dates, and evaluation dates. Describe the latter condition as a constructed hindsight workflow; do not imply that it reproduces a published study unless a specific protocol is identified.
 
-**Primary metric:** Average precision (AP), computed using the same tie-aware function in `scripts/metrics.R` for every model. AP is not classification accuracy or trapezoidal PR-AUC.
+**Primary metric:** Average precision (AP), computed using the same tie-aware function in `scripts/metrics.R` for every model. AP is not classification accuracy or trapezoidal PR-AUC. Additionally, strictly proper scoring rules such as Brier Score and Log-Loss are introduced to provide a more rigorous measure of the calibration of the predicted probabilities.
 
 **Primary estimand, separately for each model:**
 
@@ -57,7 +57,7 @@ For each paired feature comparison, use identical eligible flights, training dat
 
 Specify a chronological design before final evaluation. A proposed annual allocation is:
 - January–August: training.
-- September–October: validation and model selection.
+- September–October: validation and model selection. For more robust model and parameter selection, a time-based expanding window validation strategy will be applied to the development data (e.g., using January–June to predict July, January–July to predict August, etc.) to better capture the temporal dynamics of real-world operational scenarios.
 - November–December: untouched final evaluation.
 
 Include:
