@@ -108,6 +108,13 @@ Saved results:
 
 **Fallback:** restrict data coverage or sample training flights if needed; use fewer or smaller trees under a declared budget. Preserve the same-flight leakage comparison. Weather and aircraft-history joins remain optional.
 
+**Responsibilities:** 
+
+| Name | Part | Detail 
+|--NAME--|Data Cleaning & Preprocessing|Transform the original tables into "clean" data that the model can use directly, while strictly controlling the usability boundaries of the information.|
+|--NAME--| Model Training - Logistic Regression & Random Forest | To train the model and find the most robust parameters under both "clean" and "leaked" data conditions. |
+|--NAME--| Evaluation & Inference| Calculating metrics and generating a final report on the completely untouched November-December test set. |  
+
 ## References to use
 
 - STA2112, *Final Project Guidelines and Seed Questions*, Fall 2026, September 9, 2026; relevant lectures on legitimate information and evaluation.
