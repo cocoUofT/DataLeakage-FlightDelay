@@ -434,8 +434,10 @@ constructed hindsight workflow; do not imply that it reproduces a
 published study unless a specific protocol is identified.</p>
 <p><strong>Primary metric:</strong> Average precision (AP), computed
 using the same tie-aware function in <code>scripts/metrics.R</code> for
-every model. AP is not classification accuracy or trapezoidal
-PR-AUC.</p>
+every model. AP is not classification accuracy or trapezoidal PR-AUC.
+Additionally, strictly proper scoring rules such as Brier Score and
+Log-Loss are introduced to provide a more rigorous measure of the
+calibration of the predicted probabilities.</p>
 <p><strong>Primary estimand, separately for each model:</strong></p>
 <p><code>Delta_AP = AP_leakage - AP_clean</code></p>
 <p><strong>Secondary comparison:</strong> Does correcting information
@@ -447,8 +449,12 @@ study.</p>
 <h2>4. Evaluation plan — approximately 150–180 words</h2>
 <p>Specify a chronological design before final evaluation. A proposed
 annual allocation is: - January–August: training. - September–October:
-validation and model selection. - November–December: untouched final
-evaluation.</p>
+validation and model selection. For more robust model and parameter
+selection, a time-based expanding window validation strategy will be
+applied to the development data (e.g., using January–June to predict
+July, January–July to predict August, etc.) to better capture the
+temporal dynamics of real-world operational scenarios. -
+November–December: untouched final evaluation.</p>
 <p>Include: - Fit learned preprocessing using training data only. - Use
 a bounded, documented tuning budget for each model and feature
 condition; report settings and seeds. - Evaluate paired conditions on
@@ -556,6 +562,42 @@ relevant resource limits. No GPU or paid API is planned.</p>
 flights if needed; use fewer or smaller trees under a declared budget.
 Preserve the same-flight leakage comparison. Weather and
 aircraft-history joins remain optional.</p>
+<p><strong>Responsibilities:</strong></p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Part</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>–NAME–</td>
+<td>Data Cleaning &amp; Preprocessing</td>
+<td>Transform the original tables into “clean” data that the model can
+use directly, while strictly controlling the usability boundaries of the
+information.</td>
+</tr>
+<tr class="even">
+<td>–NAME–</td>
+<td>Model Training - Logistic Regression &amp; Random Forest</td>
+<td>To train the model and find the most robust parameters under both
+“clean” and “leaked” data conditions.</td>
+</tr>
+<tr class="odd">
+<td>–NAME–</td>
+<td>Evaluation &amp; Inference</td>
+<td>Calculating metrics and generating a final report on the completely
+untouched November-December test set.</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="references-to-use" class="section level2">
 <h2>References to use</h2>

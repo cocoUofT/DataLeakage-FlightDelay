@@ -31,18 +31,27 @@ rf_leakage <- ranger(ArrDel15 ~ DayOfWeek + scheduled_dep_minutes +
 validation$prob_rf_clean <- predict(rf_clean, data = validation)$predictions[, "1"]
 validation$prob_rf_leakage <- predict(rf_leakage, data = validation)$predictions[, "1"]
 
-# Calculate the same primary metric (AP)
+# Calculate primary AP and secondary Brier score on the same flights
 ap_rf_clean <- average_precision(validation$ArrDel15, validation$prob_rf_clean)
 ap_rf_leakage <- average_precision(validation$ArrDel15, validation$prob_rf_leakage)
 
+# Use the numeric validation outcome, not the factor training outcome.
+brier_rf_clean <- brier_score(validation$ArrDel15, validation$prob_rf_clean)
+brier_rf_leakage <- brier_score(validation$ArrDel15, validation$prob_rf_leakage)
+
 rf_results <- data.frame(model = c("Random forest: clean information",
                                    "Random forest: leakage added"),
-                         AP = c(ap_rf_clean, ap_rf_leakage))
+                         AP = c(ap_rf_clean, ap_rf_leakage),
+                         Brier = c(brier_rf_clean, brier_rf_leakage))
 
 print(rf_results)
-print(ap_rf_leakage - ap_rf_clean)
+print(c(
+  AP_gain = ap_rf_leakage - ap_rf_clean,
+  Brier_reduction = brier_rf_clean - brier_rf_leakage
+))
 
 # Save results and models
+dir.create("results/pilot", recursive = TRUE, showWarnings = FALSE)
 write.csv(rf_results, "results/pilot/random_forest_validation_AP.csv",
           row.names = FALSE)
 

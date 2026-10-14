@@ -45,11 +45,15 @@ Use two models and two feature conditions:
 
 For each paired feature comparison, use identical eligible flights, training dates, and evaluation dates. Describe the latter condition as a constructed hindsight workflow; do not imply that it reproduces a published study unless a specific protocol is identified.
 
-**Primary metric:** Average precision (AP), computed using the same tie-aware function in `scripts/metrics.R` for every model. AP is not classification accuracy or trapezoidal PR-AUC. Additionally, strictly proper scoring rules such as Brier Score and Log-Loss are introduced to provide a more rigorous measure of the calibration of the predicted probabilities.
+**Primary metric:** Average precision (AP), computed using the same tie-aware function in `scripts/metrics.R` for every model. AP measures ranking and is not classification accuracy or trapezoidal PR-AUC.
+
+**Secondary metric:** Binary Brier score, `mean((predicted_probability - actual_outcome)^2)`, calculated on the same flights; lower is better. It evaluates probability accuracy and reflects both calibration and discrimination, rather than calibration alone. Use numeric 0/1 validation outcomes. Log loss can remain an optional extension; it is not calculated in the current pilot.
 
 **Primary estimand, separately for each model:**
 
 `Delta_AP = AP_leakage - AP_clean`
+
+**Secondary estimand:** `Delta_Brier = Brier_clean - Brier_leakage`. With these sign conventions, a positive difference indicates improved apparent performance with unavailable information for either metric.
 
 **Secondary comparison:** Does correcting information availability change the model ranking? Interpret small differences using uncertainty estimates. Boosting is optional and outside the minimum core study.
 
@@ -64,8 +68,8 @@ Include:
 - Fit learned preprocessing using training data only.
 - Use a bounded, documented tuning budget for each model and feature condition; report settings and seeds.
 - Evaluate paired conditions on exactly the same final flights.
-- Report test delay prevalence and a constant-probability reference alongside AP.
-- Estimate uncertainty in AP differences with paired resampling of test dates. State that this addresses variation across evaluation dates, conditional on fitted models; it does not capture all training uncertainty. Consider longer blocks if dependence across dates is material.
+- Report delay prevalence, AP, and Brier score for each evaluation window. Use a constant-probability reference estimated from the training outcomes only; do not fit the reference probability to validation or test outcomes.
+- Estimate uncertainty in AP and Brier-score differences with paired resampling of test dates. State that this addresses variation across evaluation dates, conditional on fitted models; it does not capture all training uncertainty. Consider longer blocks if dependence across dates is material.
 - Use additional chronological development windows to assess sensitivity to time periods, keeping final evaluation separate.
 
 If retained, random-split evaluation is a separate diagnostic. Do not combine feature removal and split changes into one comparison and attribute the full difference to either factor.
@@ -87,11 +91,21 @@ If retained, random-split evaluation is a separate diagnostic. Do not combine fe
 | Logistic regression | 0.225 | 0.976 | 0.752 |
 | Random forest | 0.278 | 0.973 | 0.695 |
 
+**Secondary Brier-score results on the same 3,636 validation flights (lower is better):**
+
+| Model | Scheduled-only Brier | Leakage Brier | Reduction: clean minus leakage |
+|---|---:|---:|---:|
+| Logistic regression | 0.2769 | 0.0390 | 0.2378 |
+| Random forest | 0.2865 | 0.0399 | 0.2466 |
+
+The training-rate constant-probability reference has Brier score **0.2311**. Both clean models have larger probability errors than this reference. Random forest has higher clean AP (0.278 versus 0.225) but worse clean Brier score (0.2865 versus 0.2769), illustrating that ranking and probability accuracy need not favour the same model. Adding unavailable information improves both metrics substantially; these are retrospective validation findings, not deployable performance estimates.
+
 The constant-probability reference AP is 0.336. Both clean models fall below it overall. Daily diagnostics show average predicted risks closely follow training weekday rates that do not hold in the validation period. This supports investigating time sensitivity; it does not establish the cause of the disruptions.
 
 The minimum viable experiment is the paired feature comparison with these two models. The full study expands the time coverage and adds uncertainty estimates. Keep the proposal's pilot summary brief; the detailed tables can remain in project materials. Do not present validation findings as final test results.
 
-Saved results:
+Saved results (the existing CSV filenames now contain both `AP` and `Brier` columns):
+
 - `results/pilot/logistic_validation_AP.csv`
 - `results/pilot/random_forest_validation_AP.csv`
 
@@ -122,5 +136,6 @@ Saved results:
 - [BTS field documentation](https://www.transtats.bts.gov/Fields.asp?gnoyr_VQ=FGJ).
 - [BTS monthly download archive](https://transtats.bts.gov/PREZIP/).
 - [Average precision definition](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.average_precision_score.html): methodological reference; the pilot calculates AP in R.
+- [Brier score definition](https://scikit-learn.org/stable/modules/model_evaluation.html#brier-score-loss): methodological reference for binary mean squared probability error; the pilot calculates Brier score in R.
 - [ranger documentation](https://imbs-hl.github.io/ranger/reference/ranger.html).
 - Optional model-background reference: Probst, Wright, and Boulesteix (2019), [Hyperparameters and tuning strategies for random forest](https://arxiv.org/abs/1804.03515).

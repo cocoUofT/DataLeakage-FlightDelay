@@ -23,27 +23,43 @@ validation$prob_clean <- predict(logistic_clean, newdata = validation,
 validation$prob_leakage <- predict(logistic_leakage, newdata = validation,
                                    type = "response")
 
-# Compare AP
+# Compare AP and Brier score on the same validation flights
 
 ap_clean <- average_precision(validation$ArrDel15, validation$prob_clean)
 
 ap_leakage <- average_precision(validation$ArrDel15, validation$prob_leakage)
 
+brier_clean <- brier_score(validation$ArrDel15, validation$prob_clean)
+brier_leakage <- brier_score(validation$ArrDel15, validation$prob_leakage)
+
 data.frame(model = c("Clean information", "Leakage added"),
-           average_precision = c(ap_clean, ap_leakage))
+           average_precision = c(ap_clean, ap_leakage),
+           Brier = c(brier_clean, brier_leakage))
 
 # Apparent performance gain from unavailable information
 ap_leakage - ap_clean
 
 
 ## Save results
-ap_constant <- average_precision(validation$ArrDel15,
-                                 rep(mean(train$ArrDel15), nrow(validation)))
+# Estimate the constant probability from training outcomes only.
+constant_probability <- rep(mean(train$ArrDel15), nrow(validation))
+ap_constant <- average_precision(validation$ArrDel15, constant_probability)
+brier_constant <- brier_score(validation$ArrDel15, constant_probability)
 
 validation_results <- data.frame(
   model = c("Constant probability", "Logistic: scheduled information",
             "Logistic: leakage added"), 
-  AP = c(ap_constant, ap_clean, ap_leakage))
+  AP = c(ap_constant, ap_clean, ap_leakage),
+  Brier = c(brier_constant, brier_clean, brier_leakage))
+
+print(validation_results)
+# Both differences are positive when leakage improves apparent performance.
+print(c(
+  AP_gain = ap_leakage - ap_clean,
+  Brier_reduction = brier_clean - brier_leakage
+))
+
+dir.create("results/pilot", recursive = TRUE, showWarnings = FALSE)
 
 write.csv(validation_results, "results/pilot/logistic_validation_AP.csv",
           row.names = FALSE)

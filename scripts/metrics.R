@@ -14,3 +14,19 @@ average_precision <- function(actual, probability) {
   recall <- true_positives / sum(actual == 1)
   
   sum(diff(c(0, recall)) * precision)}
+
+# Binary Brier score: mean squared probability error; lower is better.
+# Require numeric/logical 0/1 outcomes to avoid factor arithmetic.
+brier_score <- function(actual, probability) {
+  stopifnot(
+    is.numeric(actual) || is.logical(actual),
+    is.numeric(probability),
+    length(actual) > 0,
+    length(actual) == length(probability),
+    all(actual %in% c(0, 1)),
+    all(is.finite(probability)),
+    all(probability >= 0 & probability <= 1)
+  )
+
+  mean((probability - actual)^2)
+}
