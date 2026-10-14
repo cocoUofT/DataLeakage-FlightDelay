@@ -110,7 +110,8 @@ Saved results:
 
 **Responsibilities:** 
 
-| Name | Part | Detail 
+| Name | Part | Detail |
+|---|---|---|
 |--NAME--|Data Cleaning & Preprocessing|Transform the original tables into "clean" data that the model can use directly, while strictly controlling the usability boundaries of the information.|
 |--NAME--| Model Training - Logistic Regression & Random Forest | To train the model and find the most robust parameters under both "clean" and "leaked" data conditions. |
 |--NAME--| Evaluation & Inference| Calculating metrics and generating a final report on the completely untouched November-December test set. |  
