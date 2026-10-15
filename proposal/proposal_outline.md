@@ -43,17 +43,21 @@ output:
 ## 3. Proposed comparison and primary estimands
 This project will use two models and three feature conditions for comparison.
 
-- **Model Selction:** Logistic regression and Random forest
+- **Model Selection:** Logistic regression and Random forest
 - **Feature conditions:** "Clean condition," which only contains planning information, and "Deliberate leakage condition," which adds unavailable information. The "deliberate leakage condition" includes two levels: weather leakage and weather + operational leakage.
 
 | Condition | Weather and operational information |
 |---|---|
 | Clean (C) | Information on wind direction/speed and precipitation at the takeoff and landing sites that is available before the cutoff; operational information that is available before the cutoff.|
-| Weather leakage (W) |  Include subsequent wind direction/speed measurements and cumulative precipitation values ​​close to the planned takeoff time based on model C.|
-| Weather + operational leakage (WO) | Based on model W, further includes unavailable operational information such as `DepDelay`(departure delay) and `TaxiOut`(taxiing time) |
+| Weather leakage (W) |  Includes subsequent wind direction/speed measurements and cumulative precipitation values ​​close to the planned takeoff time based on feature set C.|
+| Weather + operational leakage (WO) | Based on feature set W, further includes unavailable operational information such as `DepDelay`(departure delay) and `TaxiOut`(taxiing time) |
 
 - **Primary metric:** Average Precision (AP): AP summarizes the area under the precision-recall curve (PR curve) at different thresholds, which can comprehensively evaluate the predictive performance of the model when dealing with imbalanced data (such as flight delays). *Higher AP indicates better model performance.*
 - **Secondary metric:** Brier score: The Brier score is the mean squared error between the predicted probability and the actual binary observation. It is introduced to measure the accuracy and calibration of the model's output probability. *A lower Brier score reflects better model performance.*
+- **The primary estimand is the difference in performance between the leakage conditions and the clean condition**
+  
+  `Delta_AP = AP_leakage - AP_clean`.
+
 
 ## 4. Evaluation plan (NOT YET CHECKED!)
 
