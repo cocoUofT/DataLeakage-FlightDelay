@@ -43,7 +43,7 @@ output:
 ## 3. Proposed comparison and primary estimands
 This project will use two models and three feature conditions for comparison.
 
-- **Model Selection:** Logistic regression and Random forest
+- **Model Selection:** Logistic regression and Random Forest
 - **Feature conditions:** "Clean condition," which only contains planning information, and "Deliberate leakage condition," which adds unavailable information. The "deliberate leakage condition" includes two levels: weather leakage and weather + operational leakage.
 
 | Condition | Weather and operational information |
@@ -54,7 +54,7 @@ This project will use two models and three feature conditions for comparison.
 
 - **Primary metric:** Average Precision (AP): AP summarizes the area under the precision-recall curve (PR curve) at different thresholds, which can comprehensively evaluate the predictive performance of the model when dealing with imbalanced data (such as flight delays). *Higher AP indicates better model performance.*
 - **Secondary metric:** Brier score: The Brier score is the mean squared error between the predicted probability and the actual binary observation. It is introduced to measure the accuracy and calibration of the model's output probability. *A lower Brier score reflects better model performance.*
-- **The primary estimand is the difference in performance between the leakage conditions and the clean condition**
+- **The primary estimand is the difference in performance between the leakage conditions and the clean condition.**
   
   `Delta_AP = AP_leakage - AP_clean`.
 
@@ -72,10 +72,10 @@ Use only development data for preprocessing fitting (e.g. standardization) and b
 
 **Paired comparison:** The clean (C), weather leakage (W), and weather and operational leakage (WO) conditions must be paired and evaluated on the same test flights using equivalent parameter tuning budgets.
 
-**Evaluation:** Assess AP and Brier score and report the delay rate and a constant probability reference benchmark based on the training set.
+**Evaluation:** Assess AP and Brier score, and report the delay rate and a constant probability reference benchmark based on the training set.
 
 **Uncertainty:**
-Perform paired resampling for the test date to estimate paired confidence intervals for performance metric differences. If the time dependency between dates is significant, longer time blocks will be considered for resampling. It's important to clarify that this method primarily addresses the variation in results caused by different evaluation dates (based on a fixed-fit model), but it does not cover all training uncertainties.
+Perform paired resampling for the test date to estimate paired confidence intervals for performance metric differences. If the time dependency between dates is significant, longer time blocks will be considered for resampling. It's important to clarify that this method primarily addresses the variation in results caused by different evaluation dates (based on a fixed-fit model); however, there are still other training uncertainties that remain unaccounted for, as the model fit is held constant during this process.
 
 **Interpretation:**
 When we compare clean (C) and weather leakage (W), both time and the standards for measuring the weather have changed; both factors influence the process, so we cannot assert that the model improvement is because of time. To compensate for the inaccuracies above, we further introduce weather and operational leakage (WO) to compare W and WO. In this case, weather conditions are frozen, making the operational conditions the only factor influencing the model; so any difference in the accuracy of the two predictions can be attributed entirely to the "leakage of operational information." 
