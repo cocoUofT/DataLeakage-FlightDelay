@@ -120,7 +120,21 @@ between weather and flight delays.
 
 Responsibilities will be divided as follows:
 
-\newpage
+| Name | Responsibilities |
+|---|---|
+| Name | |
+| Name | |
+| Name | |
+
+1.Academic literature review
+2.Data collection and access checks
+3.Data cleaning and feature construction
+4.Model fitting and tuning
+5.Performance evaluation and uncertainty analysis
+6.Results interpretation and visualization
+7.Proposal and final report writing
+8.Presentation preparation
+9.Code organization and reproducibility checks
 
 ## References to use
 
