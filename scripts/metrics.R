@@ -13,22 +13,7 @@ average_precision <- function(actual, probability) {
   precision <- true_positives / endpoints
   recall <- true_positives / sum(actual == 1)
 
-  sum(diff(c(0, recall)) * precision)}
-
-# Binary Brier score: mean squared probability error; lower is better.
-# Require numeric/logical 0/1 outcomes to avoid factor arithmetic.
-brier_score <- function(actual, probability) {
-  stopifnot(
-    is.numeric(actual) || is.logical(actual),
-    is.numeric(probability),
-    length(actual) > 0,
-    length(actual) == length(probability),
-    all(actual %in% c(0, 1)),
-    all(is.finite(probability)),
-    all(probability >= 0 & probability <= 1)
-  )
-
-  mean((probability - actual)^2)
+  sum(diff(c(0, recall)) * precision)
 }
 
 # Calculate Brier Score
@@ -37,12 +22,3 @@ calculate_brier_score <- function(actual, probability) {
   mean((probability - actual)^2, na.rm = TRUE)
 }
 
-# Calculate Log-Loss (Cross-Entropy Loss)
-calculate_log_loss <- function(actual, probability) {
-  # Clip probabilities to prevent log(0) which results in -Inf or NaN
-  eps <- 1e-15
-  prob_clipped <- pmax(pmin(probability, 1 - eps), eps)
-
-  # Calculate negative log-likelihood
-  -mean(actual * log(prob_clipped) + (1 - actual) * log(1 - prob_clipped), na.rm = TRUE)
-}

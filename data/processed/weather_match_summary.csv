@@ -1,0 +1,4 @@
+"flights","early_wind_present","early_intensity_present","departure_wind_present","departure_intensity_present","departure_amount_present","set"
+14093,14093,14093,14093,14093,14093,"train"
+3636,3636,3636,3636,3636,3636,"validation"
+4851,4851,4851,4851,4851,4851,"test"

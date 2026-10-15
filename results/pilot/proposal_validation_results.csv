@@ -1,0 +1,8 @@
+"model","condition","information","AP","Brier"
+"Constant reference","constant","Training delay prevalence",0.335533553355336,0.231118678555554
+"Logistic regression","clean","Clean early weather (C)",0.229108829236187,0.277597113211447
+"Logistic regression","weather_leakage","Later weather (W)",0.226051123511383,0.277671082781047
+"Logistic regression","leakage","Later weather + operational leakage (WO)",0.9763503930815,0.0388961782861241
+"Random forest","clean","Clean early weather (C)",0.350882596953134,0.256957326749971
+"Random forest","weather_leakage","Later weather (W)",0.428610930383951,0.24214481482502
+"Random forest","leakage","Later weather + operational leakage (WO)",0.970978517790517,0.0414472530830101

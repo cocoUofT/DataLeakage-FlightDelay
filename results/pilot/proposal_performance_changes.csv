@@ -1,0 +1,7 @@
+"model","comparison","AP_gain","Brier_reduction"
+"Logistic regression","clean -> weather_leakage",-0.00305770572480424,-7.39695695995968e-05
+"Logistic regression","weather_leakage -> leakage",0.750299269570117,0.238774904494923
+"Logistic regression","clean -> leakage",0.747241563845312,0.238700934925323
+"Random forest","clean -> weather_leakage",0.0777283334308174,0.0148125119249507
+"Random forest","weather_leakage -> leakage",0.542367587406566,0.20069756174201
+"Random forest","clean -> leakage",0.620095920837384,0.215510073666961

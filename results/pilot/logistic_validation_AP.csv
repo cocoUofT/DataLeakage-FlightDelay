@@ -1,4 +1,0 @@
-"model","AP","Brier"
-"Constant probability",0.335533553355336,0.231118678555554
-"Logistic: scheduled information",0.224517439621696,0.276861812498646
-"Logistic: leakage added",0.976233402771352,0.0390415585383679
