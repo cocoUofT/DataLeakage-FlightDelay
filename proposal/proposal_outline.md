@@ -68,9 +68,9 @@ To ensure a robust and realistic assessment, we will implement a chronological d
 *   **Untouched Final Evaluation:** Nov.–Dec.
 
 **Model Development and Control:**
-*   Use only development data for preprocessing fitting (e.g. standardization) and budget-capped hyperparameter tuning. All configurations must be frozen before testing, and clean condition (C) features must be strictly limited to 2 hours before takeoff.
+Use only development data for preprocessing fitting (e.g. standardization) and budget-capped hyperparameter tuning. All configurations must be frozen before testing, and clean condition (C) features must be strictly limited to 2 hours before takeoff.
 
-**Paired comparison:** The clean (C), weather leakage (W), and weather and operation leakage (WO) conditions must be paired and evaluated on the same test flights using equivalent parameter tuning budgets.
+**Paired comparison:** The clean (C), weather leakage (W), and weather and operational leakage (WO) conditions must be paired and evaluated on the same test flights using equivalent parameter tuning budgets.
 
 **Evaluation:** Assess AP and Brier score and report the delay rate and a constant probability reference benchmark based on the training set.
 
@@ -78,7 +78,7 @@ To ensure a robust and realistic assessment, we will implement a chronological d
 Perform paired resampling for the test date to estimate paired confidence intervals for performance metric differences. If the time dependency between dates is significant, longer time blocks will be considered for resampling. It's important to clarify that this method primarily addresses the variation in results caused by different evaluation dates (based on a fixed-fit model), but it does not cover all training uncertainties.
 
 **Interpretation:**
-When we compare clean (C) and weather leakage (W), both time and the standards for measuring the weather have changed; both factors influence the process, so we cannot assert that the model improvement is because of time. To compensate for the inaccuracies above, we further introduce weather and operation leakage (WO) to compare W and WO. In this case, weather conditions are frozen, making the operation conditions the only factor influencing the model. In this way, any difference in the accuracy of the two predictions can be attributed entirely to the "leakage of operational information." This is a very elegant and rigorous step in scientific experiments.
+When we compare clean (C) and weather leakage (W), both time and the standards for measuring the weather have changed; both factors influence the process, so we cannot assert that the model improvement is because of time. To compensate for the inaccuracies above, we further introduce weather and operational leakage (WO) to compare W and WO. In this case, weather conditions are frozen, making the operation conditions the only factor influencing the model. In this way, any difference in the accuracy of the two predictions can be attributed entirely to the "leakage of operational information." This is a very elegant and rigorous step in scientific experiments.
 
 
 ## 5. Minimum viable experiment
