@@ -58,12 +58,12 @@ We will compare logistic regression and random forest under the three informatio
 
 - **Primary metric:** Average Precision (AP) summarizes precision across prediction thresholds, weighted by the corresponding increases in sensitivity. It measures how well the model ranks delayed flights above on-time flights and is useful when the outcome classes are imbalanced. *Higher AP indicates better model performance.* [@averageprecision]
 - **Secondary metric:** Brier score: The Brier score is the mean squared error between the predicted probability and the actual binary observation. It is introduced to measure the accuracy and calibration of the model's output probability. *A lower Brier score reflects better model performance.* [@brierscore]
-- **The primary estimand is the difference in performance between the leakage conditions and the clean condition.** `Delta_AP = AP_leakage - AP_clean`.
+- **Primary estimand:** The difference in performance between the leakage conditions and the clean condition.
 
 ## 3. Evaluation plan
 
-- **Data Split:** Within the development period, models will be trained on earlier flights and validated on later flights. The final test period will remain untouched until model development is complete.
-- **Model Development and Control:** Use only development data for preprocessing fitting (e.g. standardization) and budget-capped hyperparameter tuning. All configurations must be frozen before testing, and clean condition (C) features must be strictly limited to 2 hours before takeoff.
+- **Data Split:** The fixed chronological split will use January–April 2025 for training and May–June for validation; July–September remains untouched for final evaluation.
+- **Model Development and Control:** Fit preprocessing and perform variable selection using training data only. Use validation data for budget-capped tuning of both models. Freeze predictor sets and tuning settings before refitting on January–June. Clean predictors must be available two hours before scheduled departure.
 - **Paired comparison:** The clean (C), weather leakage (W), and weather and operational leakage (WO) conditions must be paired and evaluated on the same test flights using equivalent parameter tuning budgets.
 - **Evaluation:** Assess AP and Brier score, and report the delay rate and a constant probability reference benchmark based on the development set.
 - **Uncertainty:** We will estimate 95% confidence intervals for paired performance differences by resampling test dates, using longer date blocks if needed to account for temporal dependence. Models will remain fixed during resampling.
