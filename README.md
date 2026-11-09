@@ -19,6 +19,20 @@ is missing, it downloads it from IEM. The 2026 observation files already present
 are retained for future work but are not required or downloaded by this pilot.
 No forecasts are used. All other code uses base R.
 
+## Midway data: 10-airport closed network
+
+The midway study restricts to flights whose origin **and** destination are among ATL, ORD,
+DFW, DEN, LAX, SFO, JFK, SEA, PHX, MCO (`config/airports.csv`). From the project root:
+
+```bash
+python3 scripts/01a_download_weather_10airports.py      # IEM METAR, 10 stations, Jan–Sep 2025
+python3 scripts/01b_build_closed10_flights.py 1 2 3 4 5 6 7 8 9   # BTS download + filter per month
+python3 scripts/01b_build_closed10_flights.py --combine # final files in data/processed/closed10/
+```
+
+Development (Jan–Jun 2025) and final-test (Jul–Sep 2025) flights are stored in separate files;
+see `data/processed/closed10/README.md`. The test file must not be used before final evaluation.
+
 ## Files and responsibilities
 
 | File | Purpose |

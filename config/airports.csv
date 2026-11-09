@@ -1,0 +1,11 @@
+iata,icao,iem_station,iem_network,city,state,iana_timezone,observes_dst
+ATL,KATL,ATL,GA_ASOS,Atlanta,GA,America/New_York,yes
+ORD,KORD,ORD,IL_ASOS,Chicago,IL,America/Chicago,yes
+DFW,KDFW,DFW,TX_ASOS,Dallas/Fort Worth,TX,America/Chicago,yes
+DEN,KDEN,DEN,CO_ASOS,Denver,CO,America/Denver,yes
+LAX,KLAX,LAX,CA_ASOS,Los Angeles,CA,America/Los_Angeles,yes
+SFO,KSFO,SFO,CA_ASOS,San Francisco,CA,America/Los_Angeles,yes
+JFK,KJFK,JFK,NY_ASOS,New York,NY,America/New_York,yes
+SEA,KSEA,SEA,WA_ASOS,Seattle,WA,America/Los_Angeles,yes
+PHX,KPHX,PHX,AZ_ASOS,Phoenix,AZ,America/Phoenix,no
+MCO,KMCO,MCO,FL_ASOS,Orlando,FL,America/New_York,yes
