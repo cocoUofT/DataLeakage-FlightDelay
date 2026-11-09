@@ -13,32 +13,69 @@ library(lubridate)
 # ==========================================
 # 1. Load/Clean data
 # ==========================================
-history <- read_csv("features_history_dev.csv.gz")
-weather <- read_csv("weather_10airports_2025JanSep.csv.gz")
+history <- read_csv("data/processed/closed10/features_history_dev.csv.gz")
+weather <- read_csv("data/processed/closed10/weather_10airports_2025JanSep.csv.gz")
 
+# Clean(weather)
 weather <- weather %>%
+  arrange(iata, valid) %>%
+  group_by(iata, valid) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
   mutate(
     valid = force_tz(valid, tzone = "UTC"),
+    
+    # gust = M -> 0
+    gust_indicator = ifelse(is.na(gust) | gust == "M", 0, 1),
+    gust = ifelse(is.na(gust) | gust == "M", "0", gust),
     gust = as.numeric(gust),
-    p01i = as.numeric(p01i)
-  ) %>% 
-  filter(!is.na(valid)) %>% 
-  arrange(iata, valid)
+    
+    # p01i = T -> 0.0001
+    p01i = ifelse(!is.na(p01i) & p01i == "T", "0.0001", p01i),
+    p01i = as.numeric(p01i),
 
-flights <- read_csv("flights_closed10_dev_2025JanJun.csv.gz") %>%
+    ts_flag = ifelse(str_detect(wxcodes, "TS"), 1, 0), 
+    snow_fzra_flag = ifelse(str_detect(wxcodes, "SN|FZ"), 1, 0),
+    precip_intensity = case_when(
+      str_detect(wxcodes, "\\+") ~ 2,
+      str_detect(wxcodes, "\\-") ~ 0,
+      str_detect(wxcodes, "[A-Z]") ~ 1,
+      TRUE ~ 0
+    )
+  ) %>% 
+  filter(!is.na(valid))
+
+# 2025 Jan-Sep Holidays
+us_holidays_2025 <- as.Date(c(
+  "2025-01-01",
+  "2025-01-20", 
+  "2025-02-17",
+  "2025-05-26", 
+  "2025-06-19",
+  "2025-07-04", 
+  "2025-09-01"  
+))
+
+flights <- read_csv("data/processed/closed10/flights_closed10_dev_2025JanJun.csv.gz") %>%
   left_join(history, by = "flight_id") %>%
   mutate(
     cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
     scheduled_dep = cutoff_utc + minutes(120),
     scheduled_arr = scheduled_dep + minutes(CRSElapsedTime), 
-    dep_hour = hour(scheduled_dep),
-    arr_hour = hour(scheduled_arr)
-  )
+    
+    dep_hour = as.numeric(CRSDepTime) %/% 100,
+    arr_hour = as.numeric(CRSArrTime) %/% 100,
+    
+    flight_date = as.Date(scheduled_dep),
+    days_to_holiday = purrr::map_dbl(flight_date, ~ min(abs(as.numeric(.x - us_holidays_2025))))
+  ) %>%
+  select(-flight_date)
+
 
 # ==========================================
 # 2. Origin weather
 # ==========================================
-weather_cols <- c("sknt", "gust", "vsby", "p01i")
+weather_cols <- c("sknt", "gust", "gust_indicator", "vsby", "p01i", "ts_flag", "snow_fzra_flag", "precip_intensity")
 
 # Origin C (Clean)
 flights <- flights %>%
@@ -115,26 +152,37 @@ flights <- flights %>%
   select(-valid, -is_leaked_window_arr)
 
 # ==========================================
-# 4. Export
+# 4. Export & Check
 # ==========================================
 
 model_table_dev <- flights %>%
   select(
     flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr, 
-    dep_hour, arr_hour, 
+    days_to_holiday, dep_hour, arr_hour, 
     contains("_C"), contains("_W"), 
     DepDelay, TaxiOut, 
     everything()
   )
 
-# Randomly pick 3 flights for checking
+print("--- Random 3 Flights Check (Dev Data) ---")
 model_table_dev %>%
   select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
   sample_n(3) %>%
   print()
 
-# Export
-write_csv(model_table_dev, "model_table_dev.csv.gz")
+# Weather Missing Rate Report
+print("--- Weather Missing Rate Report (Origin_C - Dev Data) ---")
+model_table_dev %>%
+  group_by(Origin) %>%
+  summarise(
+    total_flights = n(),
+    missing_weather_count = sum(is.na(sknt_C)),
+    missing_rate_pct = round(mean(is.na(sknt_C)) * 100, 2)
+  ) %>%
+  arrange(desc(missing_rate_pct)) %>%
+  print()
+
+write_csv(model_table_dev, "data/processed/closed10/model_table_dev.csv.gz")
 ```
 
 
@@ -144,32 +192,59 @@ write_csv(model_table_dev, "model_table_dev.csv.gz")
 # ==========================================
 # 1. Load/Clean data
 # ==========================================
-history <- read_csv("features_history_test.csv.gz")
-weather <- read_csv("weather_10airports_2025JanSep.csv.gz")
+history <- read_csv("data/processed/closed10/features_history_test.csv.gz")
+weather <- read_csv("data/processed/closed10/weather_10airports_2025JanSep.csv.gz")
 
 weather <- weather %>%
+  arrange(iata, valid) %>%
+  group_by(iata, valid) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
   mutate(
     valid = force_tz(valid, tzone = "UTC"),
+    
+    gust_indicator = ifelse(is.na(gust) | gust == "M", 0, 1),
+    gust = ifelse(is.na(gust) | gust == "M", "0", gust),
     gust = as.numeric(gust),
-    p01i = as.numeric(p01i)
+    
+    p01i = ifelse(!is.na(p01i) & p01i == "T", "0.0001", p01i),
+    p01i = as.numeric(p01i),
+    
+    ts_flag = ifelse(str_detect(wxcodes, "TS"), 1, 0), 
+    snow_fzra_flag = ifelse(str_detect(wxcodes, "SN|FZ"), 1, 0),
+    precip_intensity = case_when(
+      str_detect(wxcodes, "\\+") ~ 2,
+      str_detect(wxcodes, "\\-") ~ 0,
+      str_detect(wxcodes, "[A-Z]") ~ 1,
+      TRUE ~ 0
+    )
   ) %>% 
-  filter(!is.na(valid)) %>% 
-  arrange(iata, valid)
+  filter(!is.na(valid))
 
-flights <- read_csv("flights_closed10_test_2025JulSep.csv.gz") %>%
+us_holidays_2025 <- as.Date(c(
+  "2025-01-01", "2025-01-20", "2025-02-17", "2025-05-26", 
+  "2025-06-19", "2025-07-04", "2025-09-01"  
+))
+
+flights <- read_csv("data/processed/closed10/flights_closed10_test_2025JulSep.csv.gz") %>%
   left_join(history, by = "flight_id") %>%
   mutate(
     cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
     scheduled_dep = cutoff_utc + minutes(120),
     scheduled_arr = scheduled_dep + minutes(CRSElapsedTime), 
-    dep_hour = hour(scheduled_dep),
-    arr_hour = hour(scheduled_arr)
-  )
+    
+    dep_hour = as.numeric(CRSDepTime) %/% 100,
+    arr_hour = as.numeric(CRSArrTime) %/% 100,
+    
+    flight_date = as.Date(scheduled_dep),
+    days_to_holiday = purrr::map_dbl(flight_date, ~ min(abs(as.numeric(.x - us_holidays_2025))))
+  ) %>%
+  select(-flight_date)
 
 # ==========================================
 # 2. Origin weather
 # ==========================================
-weather_cols <- c("sknt", "gust", "vsby", "p01i")
+weather_cols <- c("sknt", "gust", "gust_indicator", "vsby", "p01i", "ts_flag", "snow_fzra_flag", "precip_intensity")
 
 # Origin C (Clean)
 flights <- flights %>%
@@ -246,25 +321,37 @@ flights <- flights %>%
   select(-valid, -is_leaked_window_arr)
 
 # ==========================================
-# 4. Export
+# 4. Export & Check
 # ==========================================
 
-model_table_dev <- flights %>%
+model_table_test <- flights %>%
   select(
     flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr, 
-    dep_hour, arr_hour, 
+    days_to_holiday, dep_hour, arr_hour, 
     contains("_C"), contains("_W"), 
     DepDelay, TaxiOut, 
     everything()
   )
 
-# Randomly pick 3 flights for checking
-model_table_dev %>%
+# Check
+print("--- Random 3 Flights Check (Test Data) ---")
+model_table_test %>%
   select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
   sample_n(3) %>%
   print()
 
-# Export
-write_csv(model_table_dev, "model_table_test.csv.gz")
+# Weather Missing Rat
+print("--- Weather Missing Rate Report (Origin_C - Test Data) ---")
+model_table_test %>%
+  group_by(Origin) %>%
+  summarise(
+    total_flights = n(),
+    missing_weather_count = sum(is.na(sknt_C)),
+    missing_rate_pct = round(mean(is.na(sknt_C)) * 100, 2)
+  ) %>%
+  arrange(desc(missing_rate_pct)) %>%
+  print()
+
+write_csv(model_table_test, "data/processed/closed10/model_table_test.csv.gz")
 ```
 
