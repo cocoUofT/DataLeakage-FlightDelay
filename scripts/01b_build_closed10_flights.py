@@ -1,15 +1,17 @@
 """Build the 10-airport closed-network flight files from BTS monthly data (2025 Jan-Sep).
 
 Usage (from project root, Python 3 standard library only):
-  python3 scripts/01b_build_closed10_flights.py 1 2 3   # download (if needed) + filter months -> parts
+  python3 scripts/01b_build_closed10_flights.py 1 2 3   # 2025 months: download (if needed) + filter -> parts
+  python3 scripts/01b_build_closed10_flights.py 2024-07 2024-12  # 2024 months: history only (lookback)
   python3 scripts/01b_build_closed10_flights.py --combine  # merge parts into final files + summary
 
-Inputs : data/raw/bts/bts_2025_MM.zip (BTS PREZIP; downloaded if missing).
+Inputs : data/raw/bts/bts_YYYY_MM.zip (BTS PREZIP; downloaded if missing).
 Outputs: data/processed/closed10/ (see data/processed/closed10/README.md)
   flights_closed10_dev_2025JanJun.csv.gz   origin AND dest in the 10 airports, development period
   flights_closed10_test_2025JulSep.csv.gz  same, FINAL TEST period -- do not use for fitting/tuning
   history_10airports_*.csv.gz              any flight touching the 10 airports (few columns),
-                                           source for historical delay rates
+                                           source for historical delay rates; *_pre_2024JulDec is
+                                           lookback only (no 2024 study flights)
   weather_10airports_2025JanSep.csv.gz     all IEM reports for the 10 stations (UTC)
   summary_counts.csv                       counts and delay rates by month x origin
 No rows are dropped for cancellation/diversion here; use the `eligible` column
@@ -20,7 +22,7 @@ import csv, glob, gzip, io, os, sys, urllib.request, zipfile
 AIRPORTS = [r["iata"] for r in csv.DictReader(open("config/airports.csv"))]
 SET = set(AIRPORTS)
 RAW, PARTS, OUT = "data/raw/bts", "data/raw/bts/parts", "data/processed/closed10"
-URL = "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2025_{m}.zip"
+URL = "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{y}_{m}.zip"
 DEV_MONTHS, TEST_MONTHS = range(1, 7), range(7, 10)
 
 # Flight-level columns kept (everything up to the delay-cause block; diversion detail dropped).
@@ -41,11 +43,11 @@ def flight_id(r):
 def eligible(r):
     return int(r["Cancelled"] in ("0", "0.00") and r["Diverted"] in ("0", "0.00") and r["ArrDel15"] != "")
 
-def open_month(m):
-    z = f"{RAW}/bts_2025_{m:02d}.zip"
+def open_month(y, m):
+    z = f"{RAW}/bts_{y}_{m:02d}.zip"
     if not os.path.exists(z):
         os.makedirs(RAW, exist_ok=True)
-        urllib.request.urlretrieve(URL.format(m=m), z)
+        urllib.request.urlretrieve(URL.format(y=y, m=m), z)
     zf = zipfile.ZipFile(z)
     name = [n for n in zf.namelist() if n.endswith(".csv")][0]
     return io.TextIOWrapper(zf.open(name), newline="")
@@ -56,27 +58,33 @@ def gz_writer(path, cols):
     w = csv.writer(t); w.writerow(cols)
     return t, w
 
-def filter_month(m):
+def filter_month(y, m):
+    """2025 months -> closed-network + history parts; earlier years -> history part only."""
     os.makedirs(PARTS, exist_ok=True)
-    tf, wf = gz_writer(f"{PARTS}/closed_{m:02d}.csv.gz", ["flight_id"] + FLIGHT_COLS + ["eligible"])
-    th, wh = gz_writer(f"{PARTS}/hist_{m:02d}.csv.gz", HIST_COLS + ["eligible"])
+    study = y == 2025
+    if study:
+        tf, wf = gz_writer(f"{PARTS}/closed_{m:02d}.csv.gz", ["flight_id"] + FLIGHT_COLS + ["eligible"])
+    hist_name = f"{PARTS}/hist_{m:02d}.csv.gz" if study else f"{PARTS}/hist_{y}_{m:02d}.csv.gz"
+    th, wh = gz_writer(hist_name, HIST_COLS + ["eligible"])
     n_all = n_c = n_h = 0
-    with open_month(m) as src:
+    with open_month(y, m) as src:
         for r in csv.DictReader(src):
             n_all += 1
-            assert int(r["Month"]) == m and r["Year"] == "2025"
+            assert int(r["Month"]) == m and r["Year"] == str(y)
             o, d = r["Origin"], r["Dest"]
             if o in SET or d in SET:
                 n_h += 1; wh.writerow([r[c] for c in HIST_COLS] + [eligible(r)])
-                if o in SET and d in SET:
+                if study and o in SET and d in SET:
                     n_c += 1; wf.writerow([flight_id(r)] + [r[c] for c in FLIGHT_COLS] + [eligible(r)])
-    tf.close(); th.close()
-    print(f"month {m}: {n_all} BTS rows, {n_h} touching 10 airports, {n_c} closed-network")
+    if study: tf.close()
+    th.close()
+    print(f"{y}-{m:02d}: {n_all} BTS rows, {n_h} touching 10 airports, {n_c} closed-network")
 
 def combine():
     os.makedirs(OUT, exist_ok=True)
     def merge(prefix, months, out):
-        files = [f"{PARTS}/{prefix}_{m:02d}.csv.gz" for m in months]
+        files = [f"{PARTS}/{prefix}_{m:02d}.csv.gz" if isinstance(m, int) else f"{PARTS}/{prefix}_{m}.csv.gz"
+                 for m in months]
         assert all(os.path.exists(f) for f in files), f"missing parts for {out}"
         t, w = None, None
         rows = 0
@@ -90,6 +98,7 @@ def combine():
     merge("closed", TEST_MONTHS, "flights_closed10_test_2025JulSep.csv.gz")
     merge("hist", DEV_MONTHS, "history_10airports_dev_2025JanJun.csv.gz")
     merge("hist", TEST_MONTHS, "history_10airports_test_2025JulSep.csv.gz")
+    merge("hist", [f"2024_{m:02d}" for m in range(7, 13)], "history_10airports_pre_2024JulDec.csv.gz")
     # duplicate-ID check + summary by month x origin
     summary, seen, dup = {}, set(), 0
     for fn in ["flights_closed10_dev_2025JanJun.csv.gz", "flights_closed10_test_2025JulSep.csv.gz"]:
@@ -115,4 +124,6 @@ def combine():
 if __name__ == "__main__":
     if "--combine" in sys.argv: combine()
     else:
-        for m in map(int, sys.argv[1:]): filter_month(m)
+        for a in sys.argv[1:]:
+            y, m = (int(a[:4]), int(a[5:])) if "-" in a else (2025, int(a))
+            filter_month(y, m)

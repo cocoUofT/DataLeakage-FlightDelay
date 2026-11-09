@@ -11,8 +11,10 @@ change the measured performance of models predicting arrival delays of at least 
 |---|---|
 | `proposal/` | Everything used for the October proposal: report, Atlanta January 2025 pilot scripts, prepared data and results. Self-contained; see `proposal/README.md`. |
 | `config/airports.csv` | Study airports: IATA, IEM station/network, ICAO, IANA time zone, DST flag |
+| `config/airport_timezones_all.csv` | IANA time zone for all 297 airports in the history files |
 | `scripts/01a_download_weather_10airports.py` | Download IEM METAR reports for the 10 airports (Jan–Sep 2025, UTC) |
 | `scripts/01b_build_closed10_flights.py` | Download BTS monthly files and build the closed-network flight files |
+| `scripts/02_history_features.py` | As-of historical delay rates and same-day congestion features (known before the cutoff) |
 | `data/processed/closed10/` | Midway study data (see its `README.md`) |
 | `data/raw/` | Raw BTS zips and per-station weather (git-ignored; rebuilt by the scripts) |
 | `midway/` | Midway checkpoint materials and team notes |
@@ -28,7 +30,12 @@ Rebuild the data from the project root (Python 3, standard library only):
 ```bash
 python3 scripts/01a_download_weather_10airports.py
 python3 scripts/01b_build_closed10_flights.py 1 2 3 4 5 6 7 8 9
+python3 scripts/01b_build_closed10_flights.py 2024-07 2024-08 2024-09 2024-10 2024-11 2024-12
 python3 scripts/01b_build_closed10_flights.py --combine
+python3 scripts/02_history_features.py events pre
+python3 scripts/02_history_features.py events dev
+python3 scripts/02_history_features.py events test
+python3 scripts/02_history_features.py features
 ```
 
 ## Sources
