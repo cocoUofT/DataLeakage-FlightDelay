@@ -5,7 +5,6 @@ Usage (from project root, Python 3 standard library only):
   python3 scripts/01b_build_closed10_flights.py --combine  # merge parts into final files + summary
 
 Inputs : data/raw/bts/bts_2025_MM.zip (BTS PREZIP; downloaded if missing).
-         January falls back to data/raw/2025Jan.csv (same 110-column layout) if no zip.
 Outputs: data/processed/closed10/ (see data/processed/closed10/README.md)
   flights_closed10_dev_2025JanJun.csv.gz   origin AND dest in the 10 airports, development period
   flights_closed10_test_2025JulSep.csv.gz  same, FINAL TEST period -- do not use for fitting/tuning
@@ -44,8 +43,6 @@ def eligible(r):
 
 def open_month(m):
     z = f"{RAW}/bts_2025_{m:02d}.zip"
-    if not os.path.exists(z) and m == 1 and os.path.exists("data/raw/2025Jan.csv"):
-        return open("data/raw/2025Jan.csv", newline="")
     if not os.path.exists(z):
         os.makedirs(RAW, exist_ok=True)
         urllib.request.urlretrieve(URL.format(m=m), z)

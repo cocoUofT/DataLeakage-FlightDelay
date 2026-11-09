@@ -9,7 +9,7 @@
 - dev（Jan–Jun）和 test（Jul–Sep）存成不同的文件。**test 文件不要拿来 fit 或 tune**。
 
 ## 明天（周二）要做
-1. **改 `weather_helpers.R` / `02_prepare_data.R`，支持多机场**
+1. **支持多机场**：把 `proposal/scripts/weather_helpers.R` 和 `02_prepare_data.R` 复制到最外层的 `scripts/` 再修改（`proposal/` 保持原样，作为 proposal 的存档）
    - 读 `config/airports.csv`，用 `iana_timezone` 把每个航班的 CRS dep/arr 时间转成 UTC
      （origin 用 origin 的 tz，arr 用 dest 的 tz；处理 `2400`、跨午夜；DST 切换日 3/9）。
    - cutoff = scheduled departure (UTC) − 120 min。
