@@ -7,7 +7,6 @@ date: "2026-11-09"
 **Model Table Generation (Origin & Destination)**
 
 ```{r}
-
 library(tidyverse)
 library(lubridate)
 
@@ -136,5 +135,136 @@ model_table_dev %>%
 
 # Export
 write_csv(model_table_dev, "model_table_dev.csv.gz")
+```
+
+
+**Test dataset**
+
+```{r}
+# ==========================================
+# 1. Load/Clean data
+# ==========================================
+history <- read_csv("features_history_test.csv.gz")
+weather <- read_csv("weather_10airports_2025JanSep.csv.gz")
+
+weather <- weather %>%
+  mutate(
+    valid = force_tz(valid, tzone = "UTC"),
+    gust = as.numeric(gust),
+    p01i = as.numeric(p01i)
+  ) %>% 
+  filter(!is.na(valid)) %>% 
+  arrange(iata, valid)
+
+flights <- read_csv("flights_closed10_test_2025JulSep.csv.gz") %>%
+  left_join(history, by = "flight_id") %>%
+  mutate(
+    cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
+    scheduled_dep = cutoff_utc + minutes(120),
+    scheduled_arr = scheduled_dep + minutes(CRSElapsedTime), 
+    dep_hour = hour(scheduled_dep),
+    arr_hour = hour(scheduled_arr)
+  )
+
+# ==========================================
+# 2. Origin weather
+# ==========================================
+weather_cols <- c("sknt", "gust", "vsby", "p01i")
+
+# Origin C (Clean)
+flights <- flights %>%
+  left_join(
+    weather %>% select(iata, valid, all_of(weather_cols)),
+    by = join_by(Origin == iata, closest(cutoff_utc >= valid))
+  ) %>%
+  mutate(
+    valid_C = valid,
+    is_within_120m = as.numeric(difftime(cutoff_utc, valid_C, units = "mins")) <= 120
+  ) %>%
+  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
+  rename_with(~ paste0(.x, "_C"), all_of(weather_cols)) %>%
+  select(-valid, -is_within_120m)
+
+# Origin W (Leaked)
+flights <- flights %>%
+  left_join(
+    weather %>% select(iata, valid, all_of(weather_cols)),
+    by = join_by(Origin == iata, closest(scheduled_dep >= valid))
+  ) %>%
+  mutate(
+    valid_W = valid,
+    is_leaked_window = valid_W > cutoff_utc & valid_W <= scheduled_dep
+  ) %>%
+  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window, .x, NA))) %>%
+  rename_with(~ paste0(.x, "_W"), all_of(weather_cols)) %>%
+  select(-valid, -is_leaked_window)
+
+# ==========================================
+# 3. Destination Weatehr
+# ==========================================
+
+# Dest C (Clean)
+flights <- flights %>%
+  left_join(
+    weather %>% select(iata, valid, all_of(weather_cols)),
+    by = join_by(Dest == iata, closest(cutoff_utc >= valid))
+  ) %>%
+  mutate(
+    valid_Dest_C = valid,
+    is_within_120m = as.numeric(difftime(cutoff_utc, valid_Dest_C, units = "mins")) <= 120
+  ) %>%
+  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
+  rename_with(~ paste0(.x, "_Dest_C"), all_of(weather_cols)) %>%
+  select(-valid, -is_within_120m)
+
+# Dest W_dep (Leaked, based on scheduled departure)
+flights <- flights %>%
+  left_join(
+    weather %>% select(iata, valid, all_of(weather_cols)),
+    by = join_by(Dest == iata, closest(scheduled_dep >= valid))
+  ) %>%
+  mutate(
+    valid_Dest_W_dep = valid,
+    is_leaked_window_dep = valid_Dest_W_dep > cutoff_utc & valid_Dest_W_dep <= scheduled_dep
+  ) %>%
+  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_dep, .x, NA))) %>%
+  rename_with(~ paste0(.x, "_Dest_W_dep"), all_of(weather_cols)) %>%
+  select(-valid, -is_leaked_window_dep)
+
+# Dest W_arr (Leaked, based on scheduled arrival)
+flights <- flights %>%
+  left_join(
+    weather %>% select(iata, valid, all_of(weather_cols)),
+    by = join_by(Dest == iata, closest(scheduled_arr >= valid))
+  ) %>%
+  mutate(
+    valid_Dest_W_arr = valid,
+    is_leaked_window_arr = valid_Dest_W_arr > cutoff_utc & valid_Dest_W_arr <= scheduled_arr
+  ) %>%
+  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_arr, .x, NA))) %>%
+  rename_with(~ paste0(.x, "_Dest_W_arr"), all_of(weather_cols)) %>%
+  select(-valid, -is_leaked_window_arr)
+
+# ==========================================
+# 4. Export
+# ==========================================
+
+model_table_dev <- flights %>%
+  select(
+    flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr, 
+    dep_hour, arr_hour, 
+    contains("_C"), contains("_W"), 
+    DepDelay, TaxiOut, 
+    everything()
+  )
+
+# Randomly pick 3 flights for checking
+model_table_dev %>%
+  select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
+  sample_n(3) %>%
+  print()
+
+# Export
+write_csv(model_table_dev, "model_table_test.csv.gz")
 ```
 
