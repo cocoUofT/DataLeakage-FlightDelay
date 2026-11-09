@@ -1,357 +1,129 @@
 ---
-title: "STA2112_Final_Propject"
+title: "STA2112 Midway: model table (origin and destination weather)"
 output: html_document
 date: "2026-11-09"
 ---
 
-**Model Table Generation (Origin & Destination)**
+```{r setup, include = FALSE}
+# Paths are relative to the project root; knit from scripts/ still works.
+if (basename(getwd()) == "scripts") knitr::opts_knit$set(root.dir = dirname(getwd()))
+```
 
-```{r}
+**Model table generation (origin and destination).** One function builds the table for a period, so the
+development and test tables are made by identical code.
+
+```{r build-function}
 library(tidyverse)
 library(lubridate)
+source("scripts/weather_decoder.R")
+
+D <- "data/processed/closed10"
 
 # ==========================================
-# 1. Load/Clean data
+# 1. Weather (shared by both periods)
 # ==========================================
-history <- read_csv("data/processed/closed10/features_history_dev.csv.gz")
-weather <- read_csv("data/processed/closed10/weather_10airports_2025JanSep.csv.gz")
-
-# Clean(weather)
-weather <- weather %>%
+weather <- read_csv(file.path(D, "weather_10airports_2025JanSep.csv.gz"),
+                    col_types = cols(.default = col_character())) %>%
+  mutate(valid = ymd_hm(valid, tz = "UTC")) %>%
+  filter(!is.na(valid)) %>%
   arrange(iata, valid) %>%
-  group_by(iata, valid) %>%
+  group_by(iata, valid) %>%                 # duplicate timestamps: keep the last archive row
   slice_tail(n = 1) %>%
   ungroup() %>%
   mutate(
-    valid = force_tz(valid, tzone = "UTC"),
-    
-    # gust = M -> 0
-    gust_indicator = ifelse(is.na(gust) | gust == "M", 0, 1),
-    gust = ifelse(is.na(gust) | gust == "M", "0", gust),
-    gust = as.numeric(gust),
-    
-    # p01i = T -> 0.0001
-    p01i = ifelse(!is.na(p01i) & p01i == "T", "0.0001", p01i),
-    p01i = as.numeric(p01i),
-
-    ts_flag = ifelse(str_detect(wxcodes, "TS"), 1, 0), 
-    snow_fzra_flag = ifelse(str_detect(wxcodes, "SN|FZ"), 1, 0),
-    precip_intensity = case_when(
-      str_detect(wxcodes, "\\+") ~ 2,
-      str_detect(wxcodes, "\\-") ~ 0,
-      str_detect(wxcodes, "[A-Z]") ~ 1,
-      TRUE ~ 0
-    )
-  ) %>% 
-  filter(!is.na(valid))
-
-# 2025 Jan-Sep Holidays
-us_holidays_2025 <- as.Date(c(
-  "2025-01-01",
-  "2025-01-20", 
-  "2025-02-17",
-  "2025-05-26", 
-  "2025-06-19",
-  "2025-07-04", 
-  "2025-09-01"  
-))
-
-flights <- read_csv("data/processed/closed10/flights_closed10_dev_2025JanJun.csv.gz") %>%
-  left_join(history, by = "flight_id") %>%
-  mutate(
-    cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
-    scheduled_dep = cutoff_utc + minutes(120),
-    scheduled_arr = scheduled_dep + minutes(CRSElapsedTime), 
-    
-    dep_hour = as.numeric(CRSDepTime) %/% 100,
-    arr_hour = as.numeric(CRSArrTime) %/% 100,
-    
-    flight_date = as.Date(scheduled_dep),
-    days_to_holiday = purrr::map_dbl(flight_date, ~ min(abs(as.numeric(.x - us_holidays_2025))))
+    sknt = as.numeric(na_if(sknt, "M")),
+    vsby = as.numeric(na_if(vsby, "M")),
+    gust_indicator = ifelse(is.na(gust) | gust == "M", 0, 1),   # M = no gust reported
+    gust = as.numeric(ifelse(is.na(gust) | gust == "M", "0", gust)),
+    p01i = as.numeric(ifelse(!is.na(p01i) & p01i == "T", "0.0001", na_if(p01i, "M"))),  # trace -> 0.0001
+    ts_flag = ifelse(str_detect(wxcodes, "TS"), 1, 0)            # includes VCTS (thunderstorm in vicinity)
   ) %>%
-  select(-flight_date)
+  bind_cols(decode_present_weather(.$metar))  # precip_intensity (0-3), snow_fzra_flag
 
-
-# ==========================================
-# 2. Origin weather
-# ==========================================
 weather_cols <- c("sknt", "gust", "gust_indicator", "vsby", "p01i", "ts_flag", "snow_fzra_flag", "precip_intensity")
+weather_small <- weather %>% select(iata, valid, all_of(weather_cols))
 
-# Origin C (Clean)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Origin == iata, closest(cutoff_utc >= valid))
-  ) %>%
-  mutate(
-    valid_C = valid,
-    is_within_120m = as.numeric(difftime(cutoff_utc, valid_C, units = "mins")) <= 120
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_C"), all_of(weather_cols)) %>%
-  select(-valid, -is_within_120m)
+# US federal holidays around the study window (Dec 2024 - Oct 2025)
+us_holidays <- as.Date(c("2024-12-25", "2025-01-01", "2025-01-20", "2025-02-17", "2025-05-26",
+                         "2025-06-19", "2025-07-04", "2025-09-01", "2025-10-13"))
 
-# Origin W (Leaked)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Origin == iata, closest(scheduled_dep >= valid))
-  ) %>%
-  mutate(
-    valid_W = valid,
-    is_leaked_window = valid_W > cutoff_utc & valid_W <= scheduled_dep
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_W"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window)
+# Attach the latest report at `airport` with valid <= `target`; keep it only if `keep(valid)` holds.
+attach_weather <- function(flights, airport, target, suffix, keep) {
+  flights %>%
+    mutate(.airport = .data[[airport]], .target = .data[[target]]) %>%
+    left_join(weather_small, by = join_by(.airport == iata, closest(.target >= valid))) %>%
+    select(-.airport, -.target) %>%
+    mutate(keep_row = keep(valid, cutoff_utc, scheduled_dep, scheduled_arr) %in% TRUE) %>%
+    mutate(across(all_of(weather_cols), ~ ifelse(keep_row, .x, NA)),
+           valid = if_else(keep_row, valid, as.POSIXct(NA, tz = "UTC"))) %>%
+    rename_with(~ paste0(.x, suffix), all_of(c(weather_cols, "valid"))) %>%
+    select(-keep_row)
+}
+within_120 <- function(v, c, dep, arr) as.numeric(difftime(c, v, units = "mins")) <= 120  # C: v <= c, age <= 120
+after_cut_dep <- function(v, c, dep, arr) v > c & v <= dep                                # W: (c, sched dep]
+after_cut_arr <- function(v, c, dep, arr) v > c & v <= arr                                # W: (c, sched arr]
 
-# ==========================================
-# 3. Destination Weatehr
-# ==========================================
+build_model_table <- function(period, flight_file) {
+  history <- read_csv(file.path(D, paste0("features_history_", period, ".csv.gz")), show_col_types = FALSE)
+  flights <- read_csv(file.path(D, flight_file), show_col_types = FALSE,
+                      col_types = cols(CRSDepTime = col_character(), CRSArrTime = col_character(),
+                                       DepTime = col_character(), ArrTime = col_character(),
+                                       WheelsOff = col_character(), WheelsOn = col_character())) %>%
+    left_join(history, by = "flight_id") %>%
+    mutate(
+      cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
+      scheduled_dep = cutoff_utc + minutes(120),
+      scheduled_arr = scheduled_dep + minutes(CRSElapsedTime),
+      dep_hour = as.numeric(CRSDepTime) %/% 100,          # local hour at origin
+      arr_hour = as.numeric(CRSArrTime) %/% 100,          # local hour at destination
+      days_to_holiday = map_dbl(as.Date(FlightDate),      # FlightDate = local departure date
+                                ~ min(abs(as.numeric(.x - us_holidays))))
+    )
 
-# Dest C (Clean)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(cutoff_utc >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_C = valid,
-    is_within_120m = as.numeric(difftime(cutoff_utc, valid_Dest_C, units = "mins")) <= 120
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_C"), all_of(weather_cols)) %>%
-  select(-valid, -is_within_120m)
+  flights <- flights %>%
+    attach_weather("Origin", "cutoff_utc",    "_C",          within_120) %>%
+    attach_weather("Origin", "scheduled_dep", "_W",          after_cut_dep) %>%
+    attach_weather("Dest",   "cutoff_utc",    "_Dest_C",     within_120) %>%
+    attach_weather("Dest",   "scheduled_dep", "_Dest_W_dep", after_cut_dep) %>%
+    attach_weather("Dest",   "scheduled_arr", "_Dest_W_arr", after_cut_arr)
 
-# Dest W_dep (Leaked, based on scheduled departure)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(scheduled_dep >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_W_dep = valid,
-    is_leaked_window_dep = valid_Dest_W_dep > cutoff_utc & valid_Dest_W_dep <= scheduled_dep
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_dep, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_W_dep"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window_dep)
+  stopifnot(nrow(flights) == n_distinct(flights$flight_id))           # no duplicated flights
+  stopifnot(all(flights$valid_C <= flights$cutoff_utc, na.rm = TRUE),   # clean weather never after cutoff
+            all(flights$valid_Dest_C <= flights$cutoff_utc, na.rm = TRUE))
 
-# Dest W_arr (Leaked, based on scheduled arrival)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(scheduled_arr >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_W_arr = valid,
-    is_leaked_window_arr = valid_Dest_W_arr > cutoff_utc & valid_Dest_W_arr <= scheduled_arr
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_arr, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_W_arr"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window_arr)
+  flights %>%
+    select(flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr,
+           days_to_holiday, dep_hour, arr_hour,
+           ends_with("_C"), ends_with("_W"), ends_with("_W_dep"), ends_with("_W_arr"),
+           DepDelay, TaxiOut, everything())
+}
 
-# ==========================================
-# 4. Export & Check
-# ==========================================
-
-model_table_dev <- flights %>%
-  select(
-    flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr, 
-    days_to_holiday, dep_hour, arr_hour, 
-    contains("_C"), contains("_W"), 
-    DepDelay, TaxiOut, 
-    everything()
-  )
-
-print("--- Random 3 Flights Check (Dev Data) ---")
-model_table_dev %>%
-  select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
-  sample_n(3) %>%
-  print()
-
-# Weather Missing Rate Report
-print("--- Weather Missing Rate Report (Origin_C - Dev Data) ---")
-model_table_dev %>%
-  group_by(Origin) %>%
-  summarise(
-    total_flights = n(),
-    missing_weather_count = sum(is.na(sknt_C)),
-    missing_rate_pct = round(mean(is.na(sknt_C)) * 100, 2)
-  ) %>%
-  arrange(desc(missing_rate_pct)) %>%
-  print()
-
-write_csv(model_table_dev, "data/processed/closed10/model_table_dev.csv.gz")
+check_table <- function(tab, label) {
+  cat("--- Random 3 flights:", label, "---\n")
+  tab %>%
+    select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
+    slice_sample(n = 3) %>% print()
+  cat("--- Origin clean-weather missing rate:", label, "---\n")
+  tab %>% group_by(Origin) %>%
+    summarise(total_flights = n(), missing_weather_count = sum(is.na(sknt_C)),
+              missing_rate_pct = round(mean(is.na(sknt_C)) * 100, 2)) %>%
+    arrange(desc(missing_rate_pct)) %>% print()
+  cat("--- Precipitation intensity (0 none, 1 light, 2 moderate, 3 heavy), origin C ---\n")
+  print(table(tab$precip_intensity_C, useNA = "ifany"))
+}
 ```
 
+**Development data (January–June 2025)**
 
-**Test dataset**
-
-```{r}
-# ==========================================
-# 1. Load/Clean data
-# ==========================================
-history <- read_csv("data/processed/closed10/features_history_test.csv.gz")
-weather <- read_csv("data/processed/closed10/weather_10airports_2025JanSep.csv.gz")
-
-weather <- weather %>%
-  arrange(iata, valid) %>%
-  group_by(iata, valid) %>%
-  slice_tail(n = 1) %>%
-  ungroup() %>%
-  mutate(
-    valid = force_tz(valid, tzone = "UTC"),
-    
-    gust_indicator = ifelse(is.na(gust) | gust == "M", 0, 1),
-    gust = ifelse(is.na(gust) | gust == "M", "0", gust),
-    gust = as.numeric(gust),
-    
-    p01i = ifelse(!is.na(p01i) & p01i == "T", "0.0001", p01i),
-    p01i = as.numeric(p01i),
-    
-    ts_flag = ifelse(str_detect(wxcodes, "TS"), 1, 0), 
-    snow_fzra_flag = ifelse(str_detect(wxcodes, "SN|FZ"), 1, 0),
-    precip_intensity = case_when(
-      str_detect(wxcodes, "\\+") ~ 2,
-      str_detect(wxcodes, "\\-") ~ 0,
-      str_detect(wxcodes, "[A-Z]") ~ 1,
-      TRUE ~ 0
-    )
-  ) %>% 
-  filter(!is.na(valid))
-
-us_holidays_2025 <- as.Date(c(
-  "2025-01-01", "2025-01-20", "2025-02-17", "2025-05-26", 
-  "2025-06-19", "2025-07-04", "2025-09-01"  
-))
-
-flights <- read_csv("data/processed/closed10/flights_closed10_test_2025JulSep.csv.gz") %>%
-  left_join(history, by = "flight_id") %>%
-  mutate(
-    cutoff_utc = force_tz(cutoff_utc, tzone = "UTC"),
-    scheduled_dep = cutoff_utc + minutes(120),
-    scheduled_arr = scheduled_dep + minutes(CRSElapsedTime), 
-    
-    dep_hour = as.numeric(CRSDepTime) %/% 100,
-    arr_hour = as.numeric(CRSArrTime) %/% 100,
-    
-    flight_date = as.Date(scheduled_dep),
-    days_to_holiday = purrr::map_dbl(flight_date, ~ min(abs(as.numeric(.x - us_holidays_2025))))
-  ) %>%
-  select(-flight_date)
-
-# ==========================================
-# 2. Origin weather
-# ==========================================
-weather_cols <- c("sknt", "gust", "gust_indicator", "vsby", "p01i", "ts_flag", "snow_fzra_flag", "precip_intensity")
-
-# Origin C (Clean)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Origin == iata, closest(cutoff_utc >= valid))
-  ) %>%
-  mutate(
-    valid_C = valid,
-    is_within_120m = as.numeric(difftime(cutoff_utc, valid_C, units = "mins")) <= 120
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_C"), all_of(weather_cols)) %>%
-  select(-valid, -is_within_120m)
-
-# Origin W (Leaked)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Origin == iata, closest(scheduled_dep >= valid))
-  ) %>%
-  mutate(
-    valid_W = valid,
-    is_leaked_window = valid_W > cutoff_utc & valid_W <= scheduled_dep
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_W"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window)
-
-# ==========================================
-# 3. Destination Weatehr
-# ==========================================
-
-# Dest C (Clean)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(cutoff_utc >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_C = valid,
-    is_within_120m = as.numeric(difftime(cutoff_utc, valid_Dest_C, units = "mins")) <= 120
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_within_120m, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_C"), all_of(weather_cols)) %>%
-  select(-valid, -is_within_120m)
-
-# Dest W_dep (Leaked, based on scheduled departure)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(scheduled_dep >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_W_dep = valid,
-    is_leaked_window_dep = valid_Dest_W_dep > cutoff_utc & valid_Dest_W_dep <= scheduled_dep
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_dep, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_W_dep"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window_dep)
-
-# Dest W_arr (Leaked, based on scheduled arrival)
-flights <- flights %>%
-  left_join(
-    weather %>% select(iata, valid, all_of(weather_cols)),
-    by = join_by(Dest == iata, closest(scheduled_arr >= valid))
-  ) %>%
-  mutate(
-    valid_Dest_W_arr = valid,
-    is_leaked_window_arr = valid_Dest_W_arr > cutoff_utc & valid_Dest_W_arr <= scheduled_arr
-  ) %>%
-  mutate(across(all_of(weather_cols), ~ ifelse(is_leaked_window_arr, .x, NA))) %>%
-  rename_with(~ paste0(.x, "_Dest_W_arr"), all_of(weather_cols)) %>%
-  select(-valid, -is_leaked_window_arr)
-
-# ==========================================
-# 4. Export & Check
-# ==========================================
-
-model_table_test <- flights %>%
-  select(
-    flight_id, Origin, Dest, cutoff_utc, scheduled_dep, scheduled_arr, 
-    days_to_holiday, dep_hour, arr_hour, 
-    contains("_C"), contains("_W"), 
-    DepDelay, TaxiOut, 
-    everything()
-  )
-
-# Check
-print("--- Random 3 Flights Check (Test Data) ---")
-model_table_test %>%
-  select(flight_id, Dest, cutoff_utc, valid_Dest_C, scheduled_dep, valid_Dest_W_dep, scheduled_arr, valid_Dest_W_arr) %>%
-  sample_n(3) %>%
-  print()
-
-# Weather Missing Rat
-print("--- Weather Missing Rate Report (Origin_C - Test Data) ---")
-model_table_test %>%
-  group_by(Origin) %>%
-  summarise(
-    total_flights = n(),
-    missing_weather_count = sum(is.na(sknt_C)),
-    missing_rate_pct = round(mean(is.na(sknt_C)) * 100, 2)
-  ) %>%
-  arrange(desc(missing_rate_pct)) %>%
-  print()
-
-write_csv(model_table_test, "data/processed/closed10/model_table_test.csv.gz")
+```{r dev}
+model_table_dev <- build_model_table("dev", "flights_closed10_dev_2025JanJun.csv.gz")
+check_table(model_table_dev, "dev")
+write_csv(model_table_dev, file.path(D, "model_table_dev.csv.gz"))
 ```
 
+**Test data (July–September 2025).** Built with the same code; not to be inspected or used before final evaluation.
+
+```{r test}
+model_table_test <- build_model_table("test", "flights_closed10_test_2025JulSep.csv.gz")
+write_csv(model_table_test, file.path(D, "model_table_test.csv.gz"))
+```
