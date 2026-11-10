@@ -16,7 +16,7 @@ midway 改到 11/20，但 final 是 12/4，所以我们先把分析做完整。�
 - **RF tuning**（`07_tune_rf.R`，给 final 用）：三种 condition 用同一个网格各自 tune。
   W − C 在所有设定下都在 0.024–0.030，结论很稳健。
 
-## 上午要做的
+## 上午要做的 (建议)
 先 `git pull`，再跑一次 `Rscript scripts/03_prepare_midway.R`（产生 `midway_split.rds`，没有放进 git）。
 需要的 R packages：tidyverse、glmnet、ranger。
 
