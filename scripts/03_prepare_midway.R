@@ -1,5 +1,6 @@
 # Midway step 3: eligible flights, chronological split, shared complete cases.
-# Input : data/processed/closed10/model_table_dev.csv.gz (scripts/STA2112_Midway.Rmd)
+# Input : data/processed/closed10/model_table_dev.csv.gz (scripts/STA2112_Midway.Rmd),
+#         features_network_dev.csv.gz (scripts/02b_network_features.R)
 # Output: data/processed/closed10/midway_split.rds, results/midway/prep_summary.csv
 # Run from the project root:  Rscript scripts/03_prepare_midway.R
 suppressPackageStartupMessages({ library(dplyr); library(readr) })
@@ -10,7 +11,10 @@ raw <- read_csv("data/processed/closed10/model_table_dev.csv.gz", show_col_types
                 col_types = cols(CRSDepTime = col_character(), CRSArrTime = col_character()))
 
 suffixes <- unique(unlist(WEATHER_SUFFIX))
+network <- read_csv("data/processed/closed10/features_network_dev.csv.gz", show_col_types = FALSE) %>%
+  select(flight_id, net_24h_rate, net_7d_rate)
 df <- raw %>%
+  left_join(network, by = "flight_id") %>%
   filter(eligible == 1) %>%
   mutate(
     split = ifelse(Month <= 4, "train", "validation"),   # train Jan-Apr, validation May-Jun

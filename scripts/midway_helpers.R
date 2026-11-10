@@ -22,7 +22,8 @@ SCHEDULE_VARS <- c("Reporting_Airline", "Origin", "Dest", "DayOfWeek", "dep_hour
 HISTORY_VARS <- c(
   paste0("hr_", rep(c("origin", "dest", "carrier", "route"), each = 3), "_", c("182d", "28d", "7d"), "_rate"),
   "sd_origin_dep15_rate", "sd_origin_none", "sd_origin_n_log",
-  "rc_dest_3h_rate", "rc_dest_3h_none", "rc_dest_3h_n_log"
+  "rc_dest_3h_rate", "rc_dest_3h_none", "rc_dest_3h_n_log",
+  "net_24h_rate", "net_7d_rate"   # network-wide recent delay rate (scripts/02b_network_features.R)
 )
 OPERATIONAL_VARS <- c("DepDelay", "TaxiOut")   # WO only
 
