@@ -1,0 +1,3 @@
+split,eligible,dropped_incomplete,analysed,delay_rate,first_date,last_date
+train,150896,167,150729,0.2017,2025-01-01,2025-04-30
+validation,83411,184,83227,0.2805,2025-05-01,2025-06-30
