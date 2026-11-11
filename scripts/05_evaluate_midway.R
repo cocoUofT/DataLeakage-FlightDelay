@@ -175,7 +175,11 @@ p2 <- ggplot(daily_long, aes(FlightDate, value, color = series, linetype = serie
        title = "Daily Average Precision vs. Observed Delay Rate",
        subtitle = "Fluctuations in clean model performance across the validation period.") +
   theme_viz + 
-  theme(legend.text = element_text(size = 10))
+  theme(
+    legend.text = element_text(size = 10),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "#333333")
+  )
 
 ggsave(file.path(MIDWAY_DIR, "fig_daily.png"), p2, width = 9, height = 4.5, dpi = 300, bg = "white")
 
