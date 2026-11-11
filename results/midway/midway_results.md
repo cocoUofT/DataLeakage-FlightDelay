@@ -35,6 +35,7 @@ Flights: 83,227 validation (delay rate 0.281); trained on Jan–Apr 2025. Same f
 | Random forest | WO - W | 0.424 [0.398, 0.451] | [0.404, 0.450] | 0.1094 [0.1055, 0.1134] |
 
 **Table 3. Impact of Weather Leakage Across Different Weather Subgroups (W vs. C)**
+
 *(Highlights how leakage severity varies by meteorological conditions)*
 
 | weather_group | n_flights | delay_rate | AP_C | AP_W | Diff_W_minus_C | CI_Lower | CI_Upper |
