@@ -42,7 +42,8 @@ Read in R with `read.csv(gzfile(path))` or `data.table::fread(path)`.
 
 ## As-of historical features (`features_history_*.csv.gz`)
 
-**Cutoff `c` = scheduled departure (UTC) − 120 min (column `cutoff_utc`)**. Only completed, non-diverted
+**Cutoff `c` = scheduled departure (UTC) − 120 min (column `cutoff_utc`)**. 
+Only completed, non-diverted
 history flights whose outcome was **known before `c`** are used, assuming the outcome is known when it
 happens (reporting lag 0). Time zones for all 297 airports in the history files: `config/airport_timezones_all.csv`.
 
