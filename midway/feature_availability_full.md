@@ -63,7 +63,7 @@ C = clean, W = weather leakage, WO = weather + operational leakage, ✗ = never 
 | Delay causes (`CarrierDelay`, `WeatherDelay`, `NASDelay`, `SecurityDelay`, `LateAircraftDelay`) | BTS | — | Reported only when `ArrDel15` = 1 | — | **No** | ✗ | Missingness itself reveals the outcome |
 | `Cancelled`, `Diverted`, `CancellationCode` | BTS | — | Day of operation | — | **No** | ✗ | Define eligibility only |
 | **Outcome** | | | | | | | |
-| `ArrDel15` | BTS | Dest | Arrival | — | — | Target | Arrival ≥ 15 min after `CRSArrTime` |
+| `ArrDel15` | BTS | Dest | Arrival | — | — | Target | 1 if actual arrival is ≥ 15 min past `CRSArrTime` (delayed), 0 otherwise (on-time).|
 
 ## 3. Open decisions for the team
 
