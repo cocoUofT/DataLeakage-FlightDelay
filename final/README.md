@@ -53,3 +53,17 @@ Rscript final/R/04_evaluate_horizons.R                  # tables, bootstrap CIs,
 Departure/arrival events are assumed known as soon as they happen (lag 0). BTS records the aircraft that
 finally operated the flight; at long horizons the planned aircraft may differ, so rotation features at
 12 h / 6 h may be optimistic.
+
+## Plan for the final study (decided 2026-11-11, not yet done)
+
+1. **Presentation**: report the final clean model's performance; show the contribution of information
+   sources as a grouped ablation at 2 h (schedule / history and network / weather / aircraft rotation),
+   each group removed in turn, rather than singling out one variable. The horizon curve is the main
+   figure; rotation-state shares explain its shape; with/without-rotation comparisons go to the appendix.
+2. **Main leakage analysis**: rerun C / W / WO with rotation features in the shared clean predictors
+   (they were in the feature-availability table from the start). WO - C is expected to shrink because
+   rotation features and DepDelay overlap; report this as a finding.
+3. **Calibration**: try Platt scaling / isotonic recalibration for RF (fit the calibration on May-Jun,
+   refit the model on Jan-Jun, apply to test). Report AP and Brier together.
+4. **Sensitivity**: rotation features at 12 h / 6 h with same-day legs only (aircraft swaps).
+5. Freeze all settings, refit on Jan-Jun, evaluate once on the Jul-Sep test period.
