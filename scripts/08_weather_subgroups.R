@@ -67,3 +67,5 @@ results <- results %>%
 
 cat("\n--- Leakage (W - C) by Weather Condition ---\n")
 print(results)
+
+write_csv(results, "results/midway/weather_subgroups_leakage.csv")
