@@ -1,0 +1,122 @@
+% Candidate references for the final report (collected 2026-11-11).
+% NOT the report bibliography: move entries to proposal/report/references.bib (or the final report's .bib)
+% only after the team decides they are used. Each entry has a `note` on why it may be relevant.
+% Fields marked TODO were not verified from the source and must be checked before citing.
+
+% ---------- Pre-departure-only prediction and prediction timing ----------
+
+@article{schosser2022shortterm,
+  author  = {Sch{\"o}sser, Delia and Sch{\"o}nberger, J{\"o}rn},
+  title   = {On the Performance of Machine Learning Based Flight Delay Prediction -- Investigating the Impact of Short-Term Features},
+  journal = {Promet -- Traffic\&Transportation},
+  year    = {2022},
+  note    = {Closest to our question. US domestic flights (BTS), arrival delay >= 15 min, about 19\% delayed. XGBoost accuracy/recall: schedule-only 69.5/68.2; + previous flight's arrival delay 70.9/68.5; + departure delay 89.9/83.4. Training set undersampled; accuracy is below the 80.6\% always-on-time baseline for pre-departure models. Frames departure delay as a later prediction time, not as leakage; no paired CIs. Departure-delay encoding not stated. Volume/pages TODO.},
+  url     = {https://hrcak.srce.hr/file/425054}
+}
+
+@article{rebollo2014characterization,
+  author  = {Rebollo, Juan Jose and Balakrishnan, Hamsa},
+  title   = {Characterization and Prediction of Air Traffic Delays},
+  journal = {Transportation Research Part C: Emerging Technologies},
+  volume  = {44},
+  pages   = {231--241},
+  year    = {2014},
+  doi     = {10.1016/j.trc.2014.04.007},
+  note    = {Random forests with temporal and network delay states predict departure delays 2-24 h ahead on the 100 most-delayed links; studies the effect of the forecast horizon. Link-level, not individual flights. Relevant to the prediction-time extension and to network-wide delay features.}
+}
+
+@article{mamdouh2023fdppml,
+  author  = {Mamdouh, Maged and Ezzat, Mostafa and Hefny, Hesham A.},
+  title   = {A novel intelligent approach for flight delay prediction},
+  journal = {Journal of Big Data},
+  volume  = {10},
+  pages   = {179},
+  year    = {2023},
+  doi     = {10.1186/s40537-023-00854-w},
+  note    = {Notes that using the departure delay to predict arrival delay leaves a horizon of minutes. FDPP-ML passes predicted delays forward along the aircraft path to extend the horizon; tested at 2, 6 and 12 h, gains shrink with horizon. Contrast: we propagate the latest KNOWN state at the cutoff.}
+}
+
+@article{wang2022strategic,
+  author  = {Wang, Ziming and Liao, Chaohao and Hang, Xu and Li, Lishuai and Delahaye, Daniel and Hansen, Mark},
+  title   = {Distribution Prediction of Strategic Flight Delays via Machine Learning Methods},
+  journal = {Sustainability},
+  volume  = {14},
+  number  = {22},
+  pages   = {15180},
+  year    = {2022},
+  doi     = {10.3390/su142215180},
+  note    = {Strategic-phase (months ahead) prediction from schedules only; notes most work is short-range (hours to days). Background for the prediction-horizon spectrum.}
+}
+
+@article{lambelho2020strategic,
+  author  = {Lambelho, Miguel and Mitici, Mihaela and Pickup, Simon and Marsden, Alan},
+  title   = {Assessing strategic flight schedules at an airport using machine learning-based flight delay and cancellation predictions},
+  journal = {Journal of Air Transport Management},
+  year    = {2020},
+  doi     = {10.1016/j.jairtraman.2019.101737},
+  note    = {Delay and cancellation prediction 6 months ahead from strategic schedules. Background: longest horizon end of the spectrum. Volume/article number TODO.}
+}
+
+@misc{pretactical2025synthetic,
+  author       = {TODO},
+  title        = {Pre-Tactical Flight-Delay and Turnaround Forecasting with Synthetic Aviation Data},
+  year         = {2025},
+  howpublished = {arXiv:2508.02294},
+  url          = {https://arxiv.org/abs/2508.02294},
+  note         = {Pre-tactical (hours ahead, schedule-only) arrival delay prediction is hard: real-data R^2 rarely above 0.30. Supports that clean early predictions are modest. Authors TODO.}
+}
+
+% ---------- Rotation features and leakage in the literature ----------
+
+@misc{shelke2026flightsense,
+  author       = {Shelke, Aditi J. and Shelke, Renuka J. and Kamerkar, Yash M. and Hazarani, Nitin},
+  title        = {{FlightSense}: An End-to-End {MLOps} Platform for Real-Time Flight Delay Prediction via Rotation-Chain Propagation Features and Agentic Conversational {AI}},
+  year         = {2026},
+  howpublished = {arXiv:2605.07364},
+  url          = {https://arxiv.org/abs/2605.07364},
+  note         = {Excludes DepDelay/ArrDelay/delay causes as leakage, but builds prev_arr_delay from the previous leg's ACTUAL ArrDelay (shift within tail number) without checking availability before departure; AUC 0.732 -> 0.875 with rotation features. Example of rotation-feature leakage (cf. our oracle and availability shares). Cite carefully and neutrally. Year TODO (not stated in the paper).}
+}
+
+@inproceedings{xu2025aeolus,
+  author    = {Xu, Lin and Yuan, Xinyun and Liang, Yuxuan and Yin, Suwan and Wu, Yuankai},
+  title     = {Aeolus: A Multi-structural Flight Delay Dataset},
+  booktitle = {Advances in Neural Information Processing Systems (Datasets and Benchmarks Track)},
+  year      = {2025},
+  note      = {Notes that several public flight-delay datasets suffer from temporal leakage (e.g., future weather); builds temporal splits and aircraft chains by tail number within 24 h. No discussion of aircraft swaps found. arXiv:2510.26616. Pages TODO.},
+  url       = {https://arxiv.org/abs/2510.26616}
+}
+
+% ---------- Leakage methodology and reviews ----------
+
+@inproceedings{kaufman2011leakage,
+  author    = {Kaufman, Shachar and Rosset, Saharon and Perlich, Claudia},
+  title     = {Leakage in Data Mining: Formulation, Detection, and Avoidance},
+  booktitle = {Proceedings of the 17th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  pages     = {556--563},
+  year      = {2011},
+  doi       = {10.1145/2020408.2020496},
+  note      = {Standard definition of leakage: information about the target that should not be legitimately available; learn-predict separation; causal-graph view. Grounds our feature-availability table and cutoff rule.}
+}
+
+@article{kaufman2012leakage,
+  author  = {Kaufman, Shachar and Rosset, Saharon and Perlich, Claudia and Stitelman, Ori},
+  title   = {Leakage in Data Mining: Formulation, Detection, and Avoidance},
+  journal = {ACM Transactions on Knowledge Discovery from Data},
+  volume  = {6},
+  number  = {4},
+  pages   = {15},
+  year    = {2012},
+  note    = {Journal version of kaufman2011leakage; cite one of the two.}
+}
+
+@article{carvalho2021review,
+  author  = {Carvalho, Leonardo and Sternberg, Alice and Maia Gon{\c{c}}alves, Leandro and Cruz, Ana Beatriz and Soares, Jorge A. and Brand{\~a}o, Diego and Carvalho, Diego and Ogasawara, Eduardo},
+  title   = {On the relevance of data science for flight delay research: a systematic review},
+  journal = {Transport Reviews},
+  volume  = {41},
+  number  = {4},
+  pages   = {499--528},
+  year    = {2021},
+  doi     = {10.1080/01441647.2020.1861123},
+  note    = {Systematic review and taxonomy of flight-delay prediction (delay propagation, root delay, cancellation). Background for the introduction.}
+}
