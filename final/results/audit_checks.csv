@@ -1,0 +1,27 @@
+check,value,pass,note
+ArrDel15 equals ArrDelay >= 15 (all legs),0,TRUE,mismatching rows
+"own arrival / departure before cutoff, h = 12 h",0 / 0,TRUE,flights
+"own arrival / departure before cutoff, h = 6 h",0 / 0,TRUE,flights
+"own arrival / departure before cutoff, h = 4 h",0 / 0,TRUE,flights
+"own arrival / departure before cutoff, h = 2 h",0 / 0,TRUE,flights
+"own arrival / departure before cutoff, h = 1 h",0 / 2,FALSE,flights
+"own arrival / departure before cutoff, h = 30 min",0 / 3,FALSE,flights
+train and validation flights overlap,0,TRUE,
+latest training date < earliest validation date,2025-04-30 < 2025-05-01,TRUE,
+"brute-force history features, h = 12 h (40 flights x 4 checks)",0,TRUE,mismatches
+"brute-force history features, h = 30 min (40 flights x 4 checks)",0,TRUE,mismatches
+"rotation: known event after cutoff / negative projection, h = 12 h",0 / 0,TRUE,
+"rotation: known event after cutoff / negative projection, h = 6 h",0 / 0,TRUE,
+"rotation: known event after cutoff / negative projection, h = 4 h",0 / 0,TRUE,
+"rotation: known event after cutoff / negative projection, h = 2 h",0 / 0,TRUE,
+"rotation: known event after cutoff / negative projection, h = 1 h",0 / 0,TRUE,
+"rotation: known event after cutoff / negative projection, h = 30 min",0 / 0,TRUE,
+probable aircraft swap rate: on-time vs delayed flights,0.0017 vs 0.0538,FALSE,(FLAG if delayed flights swap 2x more often)
+derived departure delay equals BTS DepDelay (study flights),18,FALSE,mismatches
+"origin weather report age at cutoff, h = 12 h (min / max minutes)",0 / 84,TRUE,(> 120 means the report is not used)
+"origin weather report age at cutoff, h = 6 h (min / max minutes)",0 / 59,TRUE,(> 120 means the report is not used)
+"origin weather report age at cutoff, h = 4 h (min / max minutes)",0 / 59,TRUE,(> 120 means the report is not used)
+"origin weather report age at cutoff, h = 2 h (min / max minutes)",0 / 59,TRUE,(> 120 means the report is not used)
+"origin weather report age at cutoff, h = 1 h (min / max minutes)",0 / 59,TRUE,(> 120 means the report is not used)
+"origin weather report age at cutoff, h = 30 min (min / max minutes)",0 / 59,TRUE,(> 120 means the report is not used)
+flights with an irregular recorded rotation,"6016 (2.57%), delay rate 0.681 vs 0.218",FALSE,(FLAG: likely post-cutoff aircraft swaps)

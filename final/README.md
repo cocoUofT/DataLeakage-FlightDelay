@@ -35,6 +35,12 @@ Rscript final/R/04_evaluate_horizons.R                  # tables, bootstrap CIs,
 
 ## Key validation results (`horizon_results.md`)
 
+> **Audit caveat (2026-11-11, `results/audit_report.md`):** 2.6% of flights have irregular recorded
+> rotations (aircraft swaps, delay rate 0.68). They inflate the rotation gains, mostly at long horizons
+> (LR at 12 h: 0.049 → 0.014 on regular-rotation flights; at 2 h: 0.156 → 0.144). The numbers below are
+> all-flights results; the final analysis will use regular-rotation flights as the main specification.
+
+
 - Rotation features at 2 h: AP 0.472 → 0.628 (LR), 0.483 → 0.640 (RF); they recover about 77% of the gain
   an oracle with the previous leg's final arrival would give.
 - Performance rises steadily as the prediction moves closer to departure (RF with rotation: 0.488 at 12 h,
@@ -65,5 +71,7 @@ finally operated the flight; at long horizons the planned aircraft may differ, s
    rotation features and DepDelay overlap; report this as a finding.
 3. **Calibration**: try Platt scaling / isotonic recalibration for RF (fit the calibration on May-Jun,
    refit the model on Jan-Jun, apply to test). Report AP and Brier together.
-4. **Sensitivity**: rotation features at 12 h / 6 h with same-day legs only (aircraft swaps).
+4. **Sensitivity / audit fixes**: main rotation analysis on regular-rotation flights (refit, all feature sets);
+   all-flights version and same-day-legs-only as sensitivities; 7-day-block bootstrap; exclude a flight from its
+   own same-day count; use DepDelay for >22 h delays (see `results/audit_report.md`).
 5. Freeze all settings, refit on Jan-Jun, evaluate once on the Jul-Sep test period.
