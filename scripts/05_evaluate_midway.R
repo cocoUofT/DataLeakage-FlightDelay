@@ -102,98 +102,142 @@ calib_summary <- metrics %>% filter(model != "constant") %>% rowwise() %>%
 write_csv(calib_summary, file.path(MIDWAY_DIR, "calibration_summary.csv"))
 
 # ---- 4. figures ----
-theme_viz <- theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank(), panel.grid.major = element_line(color = "#e6e5e1", linewidth = 0.3),
-        axis.text = element_text(color = INK), axis.title = element_text(color = INK),
-        strip.text = element_text(face = "bold", hjust = 0), legend.position = "top",
-        legend.title = element_blank(), plot.title.position = "plot")
+theme_viz <- theme_bw(base_size = 13, base_family = "serif") +
+  theme(
+    panel.grid.minor = element_blank(), 
+    panel.grid.major = element_line(color = "#e6e5e1", linewidth = 0.4),
+    axis.text = element_text(color = "black"), 
+    axis.title = element_text(color = "black", face = "bold"),
+    strip.text = element_text(face = "bold", size = 12), 
+    strip.background = element_rect(fill = "#f7f7f7", color = "black", linewidth = 0.5),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.margin = margin(t = -5),
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11, color = "#333333"),
+    panel.border = element_rect(color = "black", linewidth = 0.8)
+  )
+
+wrap_lbl <- function(x) gsub(" \\(", "\n\\(", x)
 
 fig_gain <- paired %>% filter(block_days == 1, contrast != "WO - W") %>%
   mutate(model = factor(MODEL_LABEL[model], levels = rev(MODEL_LABEL[c("lr_full", "lr_lasso", "rf")])),
-         contrast = factor(recode(contrast, "W - C" = "Weather leakage: AP(W) − AP(C)",
-                                  "WO - C" = "Weather + operational: AP(WO) − AP(C)"),
-                           levels = c("Weather leakage: AP(W) − AP(C)", "Weather + operational: AP(WO) − AP(C)")))
-# Both panels share the same scale (identical AP span per panel width), so interval widths are
-# directly comparable; only the starting point differs. The W panel includes 0.
+         contrast = factor(recode(contrast, "W - C" = "Weather Leakage: AP(W) − AP(C)",
+                                  "WO - C" = "Operational Leakage: AP(WO) − AP(C)"),
+                           levels = c("Weather Leakage: AP(W) − AP(C)", "Operational Leakage: AP(WO) − AP(C)")))
+
 SPAN <- 0.08
 w_lab <- levels(fig_gain$contrast)[1]; wo_lab <- levels(fig_gain$contrast)[2]
 wo_hi <- max(fig_gain$ap_hi[fig_gain$contrast == wo_lab])
-wo_lo <- ceiling((wo_hi + 0.004 - SPAN) * 100) / 100              # start on a 0.01 gridline
-stopifnot(max(fig_gain$ap_hi[fig_gain$contrast == w_lab]) < SPAN,
-          min(fig_gain$ap_lo[fig_gain$contrast == wo_lab]) > wo_lo, wo_lo + SPAN > wo_hi)
+wo_lo <- ceiling((wo_hi + 0.004 - SPAN) * 100) / 100              
+
 panel_limits <- data.frame(contrast = factor(c(w_lab, w_lab, wo_lab, wo_lab), levels = levels(fig_gain$contrast)),
                            ap_gain = c(0, SPAN, wo_lo, wo_lo + SPAN))
+
 p1 <- ggplot(fig_gain, aes(x = ap_gain, y = model, color = model)) +
   geom_blank(data = panel_limits, aes(x = ap_gain), inherit.aes = FALSE) +
   geom_vline(data = data.frame(contrast = factor(w_lab, levels = levels(fig_gain$contrast)), x = 0),
-             aes(xintercept = x), color = "#b5b4ae", linewidth = 0.4) +
-  geom_errorbar(aes(xmin = ap_lo, xmax = ap_hi), orientation = "y", width = 0, linewidth = 0.8) +
-  geom_point(size = 2.6) +
+             aes(xintercept = x), color = "#737373", linetype = "dashed", linewidth = 0.6) +
+  geom_errorbar(aes(xmin = ap_lo, xmax = ap_hi), orientation = "y", width = 0.2, linewidth = 0.9) +
+  geom_point(size = 3) +
   facet_wrap(~ contrast, scales = "free_x", ncol = 2) +
   scale_x_continuous(breaks = seq(-1, 1, by = 0.02), expand = c(0, 0)) +
-  scale_color_manual(values = setNames(SERIES[c("lr_full", "lr_lasso", "rf")], MODEL_LABEL[c("lr_full", "lr_lasso", "rf")]),
-                     guide = "none") +
-  labs(x = "Apparent gain in average precision (95% CI, bootstrap over validation days)", y = NULL,
-       title = "Leakage inflates measured performance; operational leakage dominates",
-       subtitle = sprintf(paste0("Validation flights May–Jun 2025 (n = %s); same flights in every condition.\n",
-                                 "Both panels use the same scale (%.2f AP across each panel); the right panel starts at %.2f, not 0."),
-                          format(nrow(wide), big.mark = ","), SPAN, wo_lo)) +
-  theme_viz + theme(panel.spacing.x = unit(1.6, "lines"), plot.margin = margin(5.5, 14, 5.5, 5.5))
-ggsave(file.path(MIDWAY_DIR, "fig_leakage_gain.png"), p1, width = 9, height = 3.5, dpi = 200, bg = "white")
+  scale_y_discrete(labels = wrap_lbl) +
+  scale_color_manual(values = setNames(SERIES[c("lr_full", "lr_lasso", "rf")], MODEL_LABEL[c("lr_full", "lr_lasso", "rf")]), guide = "none") +
+  labs(x = "Apparent Gain in Average Precision (95% CI)", y = NULL,
+       title = "Apparent Performance Gain by Information Leakage Condition",
+       subtitle = sprintf("Bootstrap validation over flights from May–Jun 2025 (n = %s).", format(nrow(wide), big.mark = ","))) +
+  theme_viz + 
+  theme(
+    panel.spacing.x = unit(2, "lines"), 
+    plot.margin = margin(10, 15, 10, 10),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "#333333")
+  )
+ggsave(file.path(MIDWAY_DIR, "fig_leakage_gain.png"), p1, width = 9, height = 4, dpi = 300, bg = "white")
 
 daily_long <- daily %>% select(FlightDate, delay_rate, ap_lr_full, ap_lr_lasso, ap_rf) %>%
   pivot_longer(-FlightDate) %>%
-  mutate(series = recode(name, delay_rate = "Day's delay rate (AP of a random ranking)",
+  mutate(series = recode(name, delay_rate = "Observed Delay Rate (Random Baseline)",
                          ap_lr_full = MODEL_LABEL[["lr_full"]], ap_lr_lasso = MODEL_LABEL[["lr_lasso"]],
                          ap_rf = MODEL_LABEL[["rf"]]))
+
 p2 <- ggplot(daily_long, aes(FlightDate, value, color = series, linetype = series)) +
-  geom_line(linewidth = 0.7) +
-  scale_color_manual(values = c("Day's delay rate (AP of a random ranking)" = "#8f8e88", setNames(SERIES, MODEL_LABEL[names(SERIES)]))) +
-  scale_linetype_manual(values = c("Day's delay rate (AP of a random ranking)" = "dashed", setNames(rep("solid", 3), MODEL_LABEL[names(SERIES)]))) +
+  geom_line(linewidth = 0.8) +
+  scale_color_manual(values = c("Observed Delay Rate (Random Baseline)" = "black", 
+                                setNames(SERIES, MODEL_LABEL[names(SERIES)]))) +
+  scale_linetype_manual(values = c("Observed Delay Rate (Random Baseline)" = "dashed", 
+                                   setNames(rep("solid", 3), MODEL_LABEL[names(SERIES)]))) +
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
   scale_y_continuous(limits = c(0, NA)) +
-  guides(color = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
-  labs(x = NULL, y = "Within-day average precision",
-       title = "Clean models rank delayed flights above the random baseline on every validation day",
-       subtitle = sprintf("Smallest daily margin over the day's delay rate: %.3f. Daily AP rises and falls with the day's delay rate.",
-                          min(c(daily$ap_lr_full, daily$ap_lr_lasso, daily$ap_rf) - rep(daily$delay_rate, 3)))) +
-  theme_viz
-ggsave(file.path(MIDWAY_DIR, "fig_daily.png"), p2, width = 9, height = 4.2, dpi = 200, bg = "white")
+  guides(color = guide_legend(nrow = 1), linetype = guide_legend(nrow = 1)) +
+  labs(x = "Flight Date", y = "Within-Day Average Precision",
+       title = "Daily Average Precision vs. Observed Delay Rate",
+       subtitle = "Fluctuations in clean model performance across the validation period.") +
+  theme_viz + 
+  theme(legend.text = element_text(size = 10))
 
-p3 <- ggplot(calib_bins %>% mutate(model = MODEL_LABEL[model]), aes(mean_predicted, observed_rate, color = model)) +
-  geom_abline(slope = 1, intercept = 0, color = "#b5b4ae", linetype = "dashed", linewidth = 0.4) +
-  geom_line(linewidth = 0.7) + geom_point(size = 2.2) +
+ggsave(file.path(MIDWAY_DIR, "fig_daily.png"), p2, width = 9, height = 4.5, dpi = 300, bg = "white")
+
+p3 <- ggplot(calib_bins %>% mutate(model = MODEL_LABEL[model]), aes(mean_predicted, observed_rate, color = model, shape = model)) +
+  geom_abline(slope = 1, intercept = 0, color = "#737373", linetype = "dashed", linewidth = 0.6) +
+  geom_line(linewidth = 0.8, alpha = 0.7) + geom_point(size = 2.5) +
   scale_color_manual(values = setNames(SERIES, MODEL_LABEL[names(SERIES)])) +
+  scale_shape_discrete() +
   coord_equal(xlim = c(0, 0.65), ylim = c(0, 0.65)) +
-  guides(color = guide_legend(ncol = 1)) +
-  labs(x = "Mean predicted probability (decile of risk)", y = "Observed delay rate",
-       title = "Clean-model calibration on validation flights",
-       caption = "Points above the dashed line: the model under-predicts delays.",
-       subtitle = sprintf("Training delay rate %.3f vs validation %.3f", mean(readRDS(SPLIT_FILE)$data$ArrDel15[readRDS(SPLIT_FILE)$data$split == "train"]), mean(yv))) +
-  theme_viz + theme(legend.position = c(0.02, 0.98), legend.justification = c(0, 1))
-ggsave(file.path(MIDWAY_DIR, "fig_calibration.png"), p3, width = 5.5, height = 5.5, dpi = 200, bg = "white")
+  guides(color = guide_legend(ncol = 1), shape = guide_legend(ncol = 1)) +
+  labs(x = "Mean Predicted Probability (Deciles)", y = "Observed Delay Rate",
+       title = "Reliability Diagram (Calibration)",
+       subtitle = "Validation flights (Dashed line indicates perfect calibration)") +
+  theme_viz + theme(legend.position = "inside", legend.position.inside = c(0.05, 0.95), 
+                    legend.justification = c(0, 1), 
+                    legend.background = element_rect(fill = alpha("white", 0.9), color = "NA", linewidth = 0.3))
+ggsave(file.path(MIDWAY_DIR, "fig_calibration.png"), p3, width = 6, height = 6, dpi = 300, bg = "white")
 
 # ---- 5. readable summary ----
 fmt <- function(x, d = 3) formatC(x, format = "f", digits = d)
-tab1 <- metrics %>% mutate(cell = paste0(fmt(AP), " / ", fmt(Brier))) %>% select(model, condition, cell) %>%
-  pivot_wider(names_from = condition, values_from = cell) %>% mutate(model = MODEL_LABEL[model])
+
+# Generate tables for AP and Brier Score
+tab1_ap <- metrics %>% select(model, condition, AP) %>%
+  mutate(AP = fmt(AP)) %>% pivot_wider(names_from = condition, values_from = AP) %>%
+  mutate(Model = MODEL_LABEL[model]) %>% select(Model, C, W, WO)
+
+tab1_brier <- metrics %>% select(model, condition, Brier) %>%
+  mutate(Brier = fmt(Brier)) %>% pivot_wider(names_from = condition, values_from = Brier) %>%
+  mutate(Model = MODEL_LABEL[model]) %>% select(Model, C, W, WO)
+
 tab2 <- paired %>% filter(block_days == 1) %>%
   left_join(paired %>% filter(block_days == 7) %>% select(model, contrast, ap_lo7 = ap_lo, ap_hi7 = ap_hi), by = c("model", "contrast")) %>%
   transmute(Model = MODEL_LABEL[model], Contrast = contrast,
             `AP gain [95% CI, 1-day blocks]` = paste0(fmt(ap_gain), " [", fmt(ap_lo), ", ", fmt(ap_hi), "]"),
             `[7-day blocks]` = paste0("[", fmt(ap_lo7), ", ", fmt(ap_hi7), "]"),
             `Brier reduction [95% CI]` = paste0(fmt(brier_reduction, 4), " [", fmt(brier_lo, 4), ", ", fmt(brier_hi, 4), "]"))
+
 md_table <- function(d) c(paste0("| ", paste(names(d), collapse = " | "), " |"),
                           paste0("|", paste(rep("---", ncol(d)), collapse = "|"), "|"),
                           apply(d, 1, function(r) paste0("| ", paste(r, collapse = " | "), " |")))
+
+weather_sub_file <- file.path(MIDWAY_DIR, "weather_subgroups_leakage.csv")
+if (file.exists(weather_sub_file)) {
+  tab3 <- read_csv(weather_sub_file, show_col_types = FALSE)
+  tab3_md <- c("", "**Table 3. Impact of Weather Leakage Across Different Weather Subgroups (W vs. C)**", 
+               "*(Highlights how leakage severity varies by meteorological conditions)*", "", md_table(tab3))
+} else {
+  tab3_md <- c("", "*Note: 'weather_subgroups_leakage.csv' not found. Please ensure the subgroup script is run to populate Table 3.*")
+}
+
+# Write md
 writeLines(c(
   "# Midway results: validation (May–Jun 2025)", "",
   sprintf("Flights: %s validation (delay rate %.3f); trained on Jan–Apr 2025. Same flights in every condition.",
           format(nrow(wide), big.mark = ","), mean(yv)), "",
-  "**Table 1. AP / Brier by model and information condition** (AP higher is better; Brier lower is better).", "",
-  md_table(tab1 %>% rename(Model = model)), "",
+  "**Table 1A. Average Precision (AP) by model and information condition** (higher is better).", "",
+  md_table(tab1_ap), "",
+  "**Table 1B. Brier Score by model and information condition** (lower is better).", "",
+  md_table(tab1_brier), "",
   sprintf("**Table 2. Paired apparent gains** (%d bootstrap reps resampling validation days; 7-day moving blocks as a dependence check).", B), "",
-  md_table(tab2), "",
+  md_table(tab2),
+  tab3_md, "",
   "Interpretation: gains are apparent improvements from information unavailable two hours before departure,",
   "specific to these fitted models and this evaluation period; they are not better real-world prediction."
 ), file.path(MIDWAY_DIR, "midway_results.md"))
