@@ -30,7 +30,7 @@ C = clean, W = weather leakage, WO = weather + operational leakage, ✗ = never 
 | Scheduled dep time (`CRSDepTime`) → hour of day | BTS | Origin local | Schedule | Weeks before | Yes | C | Use spline or blocks, not linear minutes (pilot issue) |
 | Scheduled arr time (`CRSArrTime`) → hour | BTS | Dest local | Schedule | Weeks before | Yes | C | |
 | `CRSElapsedTime`, `Distance` | BTS | — | Schedule | Weeks before | Yes | C | Collinear; may keep one |
-| Month, day of week | BTS / calendar | Origin local date | Calendar | — | Yes | C | DayOfWeek was confounded with storm days in the pilot; check with Jan–Apr training |
+| Month, day of week | BTS / calendar | Origin local date | Calendar | — | Yes | C (day of week only) | DayOfWeek was confounded with storm days in the pilot; check with Jan–Apr training; Month not used at midway (validation months absent from training) |
 | US holiday / days to holiday | Calendar | Origin local date | Calendar | — | Yes | C | Build from a federal-holiday list |
 | `DepTimeBlk`, `ArrTimeBlk` | BTS | Local | Schedule | — | Yes | C | Scheduled-time blocks, despite the name; redundant with hour |
 | `Tail_Number` (aircraft) | BTS | — | Assigned before the day, can be swapped | Uncertain | **Assumed yes** | C (sensitivity) | Final reported tail may reflect same-day swaps; used only for previous-leg features below |
@@ -50,6 +50,7 @@ C = clean, W = weather leakage, WO = weather + operational leakage, ✗ = never 
 | Historical delay rates (origin, dest, carrier, route) | BTS history files | UTC after conversion | Each past flight's actual arrival | 0 (operational) | Only flights with actual arrival (UTC) < *c* | C | **Built** (`scripts/02_history_features.py`): 182-, 28- and 7-day windows; Jul–Dec 2024 added so January has a full 182-day lookback. Origin × hour not built yet. **Public-data variant:** BTS releases each month about 2 months later, so only months released before *c* would count (sensitivity) |
 | Same-day departure delays so far at origin | BTS history | UTC | Actual dep of earlier flights | 0 | Only flights with actual dep (UTC) < *c* | C | **Built.** Missing for 4% of training flights (no earlier departures) |
 | Recent arrival delays at destination (last 3 h) | BTS history | UTC | Actual arrival of earlier flights | 0 | Only flights with actual arrival in [*c* − 3 h, *c*) | C | **Built.** Missing for 2% |
+| Network-wide delay rate, last 24 h and 7 days (flights departing the 10 airports) | BTS history | UTC | Actual arrival of earlier flights | 0 | Only flights with actual arrival (UTC) < *c* | C | **Built** (`scripts/02b_network_features.R`); added after the first midway run, improves clean LR |
 | Inbound aircraft (previous leg, same tail): scheduled turnaround time | BTS history | UTC | Schedule | — | Yes | C | Previous leg may be outside the 10 airports; history files cover any flight touching them |
 | Inbound aircraft: delay, if the previous leg arrived (or departed) before *c* | BTS history | UTC | Previous leg's actual times | 0 | Only if realized before *c*; otherwise "not yet known" | C | Encode "not yet arrived" as its own category, not as zero delay |
 | **Operational, after departure** | | | | | | | |
