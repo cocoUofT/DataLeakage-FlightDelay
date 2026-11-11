@@ -1,8 +1,10 @@
 # Feature-availability table (draft v1, 2026-11-09)
 
-**Prediction time.** For each flight, the cutoff is *c* = scheduled departure (UTC) − 120 min.
+**Prediction time:** For each flight, the **cutoff is *c* = scheduled departure (UTC) − 120 min**.
+
 A feature is **clean (C)** only if its value is realized **and** would have been reported by *c*.
-Population: completed, non-diverted flights between the 10 study airports (`eligible = 1`);
+
+**Population:** completed, non-diverted flights between the 10 study airports (`eligible = 1`);
 this conditions on completion, so results exclude cancellation/diversion risk.
 
 ## 1. Time handling (applies to every row)
