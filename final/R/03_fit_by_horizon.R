@@ -10,13 +10,16 @@
 #   At h = 120 also "oracle": rotation + the previous leg's FINAL arrival delay and the delay it implies for
 #   this flight (unavailable at the cutoff) - an upper bound for perfect inbound-aircraft information.
 #   Existing prediction files are reused; delete one to refit it.
-# Output: final/results/preds/<model>_<set>_h<h>.rds, final/data/keep_ids.rds
-# Run from the project root:  Rscript final/R/03_fit_by_horizon.R keep     (once, after all horizons are built)
-#                             Rscript final/R/03_fit_by_horizon.R <h>      (one horizon per run)
+#   Population (2nd argument): "regular" (main; irregular recorded rotations excluded from training and
+#   evaluation, see final_helpers.R) or "all_flights" (sensitivity).
+# Output: final/results/<population>/preds/<model>_<set>_h<h>.rds, final/data/keep_ids_<population>.rds
+# Run from the project root:  Rscript final/R/03_fit_by_horizon.R keep              (once, after all horizons are built)
+#                             Rscript final/R/03_fit_by_horizon.R <h> [population]  (one horizon per run; default regular)
 suppressPackageStartupMessages({ library(dplyr); library(splines); library(ranger) })
 source("final/R/final_helpers.R")
 args <- commandArgs(trailingOnly = TRUE)
-pred_dir <- file.path(FINAL_RES, "preds"); dir.create(pred_dir, recursive = TRUE, showWarnings = FALSE)
+pop <- if (length(args) >= 2) args[2] else "regular"
+pred_dir <- file.path(pop_dir(pop), "preds"); dir.create(pred_dir, recursive = TRUE, showWarnings = FALSE)
 study <- readRDS(file.path(FINAL_DATA, "study.rds"))
 
 prepare <- function(h) {
@@ -38,13 +41,17 @@ if (args[1] == "keep") {
     complete.cases(d[, needed])
   }))
   ids <- prepare(HORIZONS[1])$flight_id[ok]
-  saveRDS(ids, file.path(FINAL_DATA, "keep_ids.rds"))
-  message("kept ", length(ids), " of ", length(ok), " flights (complete at every horizon)")
+  saveRDS(ids, file.path(FINAL_DATA, "keep_ids_all_flights.rds"))
+  irr <- study$flight_id[irregular_rotation(readRDS(file.path(FINAL_DATA, "legs.rds")), study)]
+  reg <- setdiff(ids, irr)
+  saveRDS(reg, file.path(FINAL_DATA, "keep_ids_regular.rds"))
+  message("all_flights: kept ", length(ids), " of ", length(ok), " flights (complete at every horizon); ",
+          "regular: ", length(reg), " (", length(ids) - length(reg), " irregular rotations removed)")
   quit(save = "no")
 }
 
 h <- as.integer(args[1])
-keep <- readRDS(file.path(FINAL_DATA, "keep_ids.rds"))
+keep <- readRDS(file.path(FINAL_DATA, paste0("keep_ids_", pop, ".rds")))
 d <- prepare(h) %>% filter(flight_id %in% keep)
 tr <- d[d$split == "train", ]; va <- d[d$split == "validation", ]
 lr_formula <- function(vars) {

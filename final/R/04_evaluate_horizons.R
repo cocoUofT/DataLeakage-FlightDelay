@@ -1,16 +1,18 @@
 # Final study, step 4: validation performance by prediction time, value of rotation features, figures.
-# Input : final/results/preds/*.rds (03), final/data/{study,keep_ids,features_h*}.rds
-# Output: final/results/ horizon_metrics.csv, horizon_gains.csv, rotation_states.csv, rotation_importance.csv,
-#         fig_horizon_ap.png, fig_rotation_gain.png, fig_rotation_states.png, horizon_results.md
-# Run from the project root:  Rscript final/R/04_evaluate_horizons.R [B]
+# Input : final/results/<population>/preds/*.rds (03), final/data/{study,keep_ids_<population>,features_h*}.rds
+# Output: final/results/<population>/ horizon_metrics.csv, horizon_gains.csv, rotation_states.csv,
+#         rotation_importance.csv, horizon_calibration*.csv, fig_*.png, horizon_results.md
+# Run from the project root:  Rscript final/R/04_evaluate_horizons.R [B] [population]   (default 1000, regular)
 suppressPackageStartupMessages({ library(dplyr); library(tidyr); library(readr); library(ggplot2); library(parallel) })
 source("final/R/final_helpers.R"); source("proposal/scripts/metrics.R")
 args <- commandArgs(trailingOnly = TRUE); B <- if (length(args)) as.integer(args[1]) else 1000L
+pop <- if (length(args) >= 2) args[2] else "regular"; RES <- pop_dir(pop)
+POP_LABEL <- c(regular = "regular aircraft rotations only", all_flights = "all flights")[[pop]]
 CORES <- max(1L, min(4L, detectCores()))
 
-study <- readRDS(file.path(FINAL_DATA, "study.rds")); keep <- readRDS(file.path(FINAL_DATA, "keep_ids.rds"))
+study <- readRDS(file.path(FINAL_DATA, "study.rds")); keep <- readRDS(file.path(FINAL_DATA, paste0("keep_ids_", pop, ".rds")))
 y <- study %>% filter(flight_id %in% keep, split == "validation") %>% select(flight_id, FlightDate, ArrDel15)
-preds <- bind_rows(lapply(list.files(file.path(FINAL_RES, "preds"), pattern = "^(lr|rf)_", full.names = TRUE), readRDS))
+preds <- bind_rows(lapply(list.files(file.path(RES, "preds"), pattern = "^(lr|rf)_", full.names = TRUE), readRDS))
 wide <- preds %>% mutate(key = paste(model, set, horizon, sep = "|")) %>% select(flight_id, key, p) %>%
   pivot_wider(names_from = key, values_from = p) %>% inner_join(y, by = "flight_id") %>% arrange(FlightDate)
 keys <- setdiff(names(wide), c("flight_id", "FlightDate", "ArrDel15"))
@@ -33,7 +35,7 @@ metrics <- parse_key(keys) %>% mutate(
   mean_p = colMeans(P), n = length(yv), delay_rate = mean(yv),
   constant_brier = mean((train_rate - yv)^2)) %>%
   arrange(model, set, desc(horizon))
-write_csv(metrics, file.path(FINAL_RES, "horizon_metrics.csv"))
+write_csv(metrics, file.path(RES, "horizon_metrics.csv"))
 
 diff_ci <- function(a, b) { d <- reps[, a] - reps[, b]; c(est = point[[a]] - point[[b]], lo = quantile(d, .025, names = FALSE), hi = quantile(d, .975, names = FALSE),
   # Brier reduction (b minus a: positive = a has lower Brier)
@@ -57,15 +59,15 @@ gains <- bind_rows(
     mutate(comparison = "oracle - rotation (2h)", v = list(diff_ci(paste(model, "oracle", 120, sep = "|"), paste(model, "rotation", 120, sep = "|")))) %>% ungroup()
 ) %>% mutate(ap_diff = sapply(v, `[`, "est"), lo = sapply(v, `[`, "lo"), hi = sapply(v, `[`, "hi"),
          brier_reduction = sapply(v, `[`, "b_est"), brier_lo = sapply(v, `[`, "b_lo"), brier_hi = sapply(v, `[`, "b_hi")) %>% select(-v)
-write_csv(gains, file.path(FINAL_RES, "horizon_gains.csv"))
+write_csv(gains, file.path(RES, "horizon_gains.csv"))
 
 # ---- rotation state shares and importance ----
 states <- bind_rows(lapply(HORIZONS, function(h) readRDS(file.path(FINAL_DATA, sprintf("features_h%03d.rds", h))) %>%
   filter(flight_id %in% keep) %>% count(rot_state) %>% mutate(horizon = h, share = n / sum(n))))
-write_csv(states, file.path(FINAL_RES, "rotation_states.csv"))
-imp <- bind_rows(lapply(list.files(file.path(FINAL_RES, "preds"), pattern = "^importance", full.names = TRUE), readRDS)) %>%
+write_csv(states, file.path(RES, "rotation_states.csv"))
+imp <- bind_rows(lapply(list.files(file.path(RES, "preds"), pattern = "^importance", full.names = TRUE), readRDS)) %>%
   filter(set == "rotation") %>% group_by(horizon) %>% mutate(rank = rank(-importance), share = importance / sum(importance)) %>% ungroup()
-write_csv(imp, file.path(FINAL_RES, "rotation_importance.csv"))
+write_csv(imp, file.path(RES, "rotation_importance.csv"))
 
 # ---- figures ----
 SERIES <- c(lr = "#2a78d6", rf = "#1baf7a"); INK <- "#52514e"
@@ -92,10 +94,10 @@ p1 <- ggplot(m_plot, aes(x, AP, color = series, linetype = series, group = serie
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   labs(x = "Prediction time (before scheduled departure)", y = "Average precision (95% CI)",
        title = "Clean-model performance rises as the prediction time moves closer to departure",
-       subtitle = sprintf("Validation flights May–Jun 2025 (n = %s, delay rate %.3f); same flights at every prediction time.\nEach model uses only information known at its prediction time.",
-                          format(length(yv), big.mark = ","), mean(yv))) +
+       subtitle = sprintf("Validation flights May–Jun 2025, %s (n = %s, delay rate %.3f).\nSame flights at every prediction time; each model uses only information known at its prediction time.",
+                          POP_LABEL, format(length(yv), big.mark = ","), mean(yv))) +
   theme_viz
-ggsave(file.path(FINAL_RES, "fig_horizon_ap.png"), p1, width = 9.5, height = 5, dpi = 200, bg = "white")
+ggsave(file.path(RES, "fig_horizon_ap.png"), p1, width = 9.5, height = 5, dpi = 200, bg = "white")
 
 VAR <- c("rotation - base" = "Full chain: latest known leg of the aircraft", "prev1 - base" = "Previous leg only")
 g_plot <- gains %>% filter(comparison %in% names(VAR)) %>%
@@ -109,7 +111,7 @@ p2 <- ggplot(g_plot, aes(x, ap_diff, color = variant, group = variant)) +
   scale_color_manual(values = setNames(c("#1f5fb0", "#9cc0ee"), VAR)) +
   labs(x = "Prediction time (before scheduled departure)", y = "AP gain over midway clean predictors (95% CI)",
        title = "Inbound-aircraft information helps most near departure; looking further back helps early on") + theme_viz
-ggsave(file.path(FINAL_RES, "fig_rotation_gain.png"), p2, width = 9.5, height = 4.4, dpi = 200, bg = "white")
+ggsave(file.path(RES, "fig_rotation_gain.png"), p2, width = 9.5, height = 4.4, dpi = 200, bg = "white")
 
 state_lab <- c(no_prev = "No previous leg within 36 h", chain_unknown = "Previous legs, none departed yet",
                chain_known = "Earlier leg known, previous not departed", prev_inflight = "Previous leg in the air",
@@ -122,7 +124,7 @@ p3 <- ggplot(states %>% mutate(x = hx(horizon), state = factor(state_lab[as.char
   scale_y_continuous(labels = scales::percent) + guides(fill = guide_legend(nrow = 2)) +
   labs(x = "Prediction time (before scheduled departure)", y = "Share of flights",
        title = "What is known about the inbound aircraft at each prediction time") + theme_viz
-ggsave(file.path(FINAL_RES, "fig_rotation_states.png"), p3, width = 9, height = 4.6, dpi = 200, bg = "white")
+ggsave(file.path(RES, "fig_rotation_states.png"), p3, width = 9, height = 4.6, dpi = 200, bg = "white")
 
 
 # ---- calibration (diagnostic) ----
@@ -135,11 +137,11 @@ calib <- parse_key(keys) %>% mutate(
   brier = vapply(keys, function(k) mean((P[, k] - yv)^2), 0),
   brier_shifted = vapply(keys, function(k) { o <- lg(P[, k]); a <- coef(glm(yv ~ 1 + offset(o), family = binomial()))[1]; mean((plogis(o + a) - yv)^2) }, 0)) %>%
   arrange(model, set, desc(horizon))
-write_csv(calib, file.path(FINAL_RES, "horizon_calibration.csv"))
+write_csv(calib, file.path(RES, "horizon_calibration.csv"))
 bins <- bind_rows(lapply(keys, function(k) { kk <- parse_key(k)
   tibble(p = P[, k], y = yv) %>% mutate(bin = ntile(p, 10)) %>% group_by(bin) %>%
     summarise(mean_predicted = mean(p), observed_rate = mean(y), .groups = "drop") %>% bind_cols(kk) }))
-write_csv(bins, file.path(FINAL_RES, "horizon_calibration_bins.csv"))
+write_csv(bins, file.path(RES, "horizon_calibration_bins.csv"))
 
 b_plot <- metrics %>% filter(set %in% c("base", "rotation")) %>%
   mutate(x = hx(horizon), series = paste0(MODEL[model], ifelse(set == "rotation", " + aircraft rotation", " (midway clean predictors)")))
@@ -156,7 +158,7 @@ p4 <- ggplot(b_plot, aes(x, Brier, color = series, linetype = series, group = se
   guides(color = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
   labs(x = "Prediction time (before scheduled departure)", y = "Brier score (95% CI; lower is better)",
        title = "Probability accuracy improves the same way as ranking as departure approaches") + theme_viz
-ggsave(file.path(FINAL_RES, "fig_horizon_brier.png"), p4, width = 9.5, height = 5, dpi = 200, bg = "white")
+ggsave(file.path(RES, "fig_horizon_brier.png"), p4, width = 9.5, height = 5, dpi = 200, bg = "white")
 
 HCOL <- c("12 h" = "#9cc0ee", "2 h" = "#4f8fdc", "30 min" = "#1a4f94")
 c_plot <- bins %>% filter(set == "rotation", horizon %in% c(720, 120, 30)) %>%
@@ -171,7 +173,7 @@ p5 <- ggplot(c_plot, aes(mean_predicted, observed_rate, color = h)) +
        subtitle = sprintf("Validation delay rate %.3f vs training %.3f; points above the line = delays under-predicted.", mean(yv), train_rate),
        caption = "Points above the dashed line: the model under-predicts delays.") +
   theme_viz + theme(legend.title = element_text(color = INK))
-ggsave(file.path(FINAL_RES, "fig_horizon_calibration.png"), p5, width = 9, height = 5.2, dpi = 200, bg = "white")
+ggsave(file.path(RES, "fig_horizon_calibration.png"), p5, width = 9, height = 5.2, dpi = 200, bg = "white")
 
 # ---- readable summary ----
 fmt <- function(x, d = 3) formatC(x, format = "f", digits = d)
@@ -191,11 +193,11 @@ t5 <- calib %>% filter(set %in% c("base", "rotation")) %>%
             brier = fmt(brier, 4), brier_shifted = fmt(brier_shifted, 4))
 md <- function(d) c(paste0("| ", paste(names(d), collapse = " | "), " |"), paste0("|", paste(rep("---", ncol(d)), collapse = "|"), "|"),
                     apply(d, 1, function(r) paste0("| ", paste(r, collapse = " | "), " |")))
-writeLines(c("# Final study (extension): prediction time and aircraft rotation — validation May–Jun 2025", "",
+writeLines(c(paste0("# Final study (extension): prediction time and aircraft rotation — validation May–Jun 2025 — ", POP_LABEL), "",
   sprintf("n = %s validation flights (delay rate %.3f), identical at every prediction time. Bootstrap: %d reps over validation days.", format(length(yv), big.mark = ","), mean(yv), B), "",
   "**AP [95% CI] by prediction time**", "", md(t1), "", "**Paired differences in AP [95% CI]**", "", md(t2), "",
   sprintf("**Brier [95%% CI] by prediction time** (constant reference = training delay rate: %.4f)", unique(metrics$constant_brier)), "", md(t3), "",
   "**Paired Brier reductions [95% CI]** (positive = first model more accurate)", "", md(t4), "",
   "**Calibration (diagnostic)**: mean prediction, calibration-in-the-large (mean - observed), slope, Brier after intercept shift", "", md(t5)),
-  file.path(FINAL_RES, "horizon_results.md"))
+  file.path(RES, "horizon_results.md"))
 message("done")

@@ -55,3 +55,17 @@ keyed_window <- function(ev_key, ev_time, ev_y, q_key, q_lo, q_hi) {
   n <- hi - lo
   list(n = n, k = cy[hi + 1] - cy[lo + 1])
 }
+
+# Analysis populations. "regular" (main): flights whose recorded aircraft rotation is regular right before them.
+# "all_flights" (sensitivity): every eligible flight. Irregular = the same aircraft's previous row (within 36 h)
+# is schedule-infeasible (scheduled arrival after this flight's scheduled departure) or ends at another airport.
+# These are mostly aircraft swaps recorded under the final tail number; swaps follow disruptions, so the
+# record carries post-cutoff information (final/results/audit_report.md). Excluded from training AND evaluation.
+POPULATIONS <- c("regular", "all_flights")
+pop_dir <- function(pop) { stopifnot(pop %in% POPULATIONS); file.path(FINAL_RES, pop) }
+irregular_rotation <- function(legs, study) {
+  lg <- legs[!is.na(legs$Tail_Number), ]; lg <- lg[order(lg$Tail_Number, lg$dep_sched), ]
+  pos <- match(study$flight_id, lg$flight_id); prev <- pmax(pos - 1L, 1L)
+  recent <- pos > 1 & lg$Tail_Number[prev] == study$Tail_Number & (study$dep_sched - lg$dep_sched[prev]) <= ROT_MAX_HOURS * 60
+  recent & (lg$arr_sched[prev] > study$dep_sched | lg$Dest[prev] != as.character(study$Origin))
+}

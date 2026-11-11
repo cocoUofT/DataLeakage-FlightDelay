@@ -4,7 +4,7 @@ suppressPackageStartupMessages({ library(dplyr); library(readr) })
 source("final/R/final_helpers.R")
 res <- list(); add <- function(check, value, pass, note = "") { res[[length(res) + 1]] <<- tibble(check, value = as.character(value), pass, note); cat(sprintf("[%s] %s: %s %s\n", ifelse(pass, "OK", "FLAG"), check, value, note)) }
 legs <- readRDS(file.path(FINAL_DATA, "legs.rds")); study <- readRDS(file.path(FINAL_DATA, "study.rds"))
-keep <- readRDS(file.path(FINAL_DATA, "keep_ids.rds"))
+keep <- readRDS(file.path(FINAL_DATA, "keep_ids_all_flights.rds"))   # diagnostics use the all-flights population
 
 # 1. Outcome coding: ArrDel15 == (ArrDelay >= 15) for every completed leg
 bad <- sum(legs$ArrDel15 != as.integer(legs$ArrDelay >= 15))
@@ -79,7 +79,7 @@ add("flights with an irregular recorded rotation", sprintf("%d (%.2f%%), delay r
     mean(study$ArrDel15[irregular]), mean(study$ArrDel15[!irregular])), FALSE, "(FLAG: likely post-cutoff aircraft swaps)")
 source("proposal/scripts/metrics.R")
 yv <- study %>% mutate(irregular = irregular) %>% filter(flight_id %in% keep, split == "validation") %>% select(flight_id, ArrDel15, irregular)
-P <- bind_rows(lapply(list.files(file.path(FINAL_RES, "preds"), pattern = "^(lr|rf)_(base|rotation)_", full.names = TRUE), readRDS)) %>% inner_join(yv, by = "flight_id")
+P <- bind_rows(lapply(list.files(file.path(FINAL_RES, "all_flights", "preds"), pattern = "^(lr|rf)_(base|rotation)_", full.names = TRUE), readRDS)) %>% inner_join(yv, by = "flight_id")
 g <- P %>% group_by(model, set, horizon) %>% summarise(all = average_precision(ArrDel15, p), regular = average_precision(ArrDel15[!irregular], p[!irregular]), .groups = "drop") %>%
   tidyr::pivot_wider(names_from = set, values_from = c(all, regular)) %>%
   transmute(model, horizon, gain_all = all_rotation - all_base, gain_regular_only = regular_rotation - regular_base) %>% arrange(model, desc(horizon))

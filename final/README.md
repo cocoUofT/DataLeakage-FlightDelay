@@ -13,12 +13,18 @@ validate May–Jun 2025); the Jul–Sep test period is untouched.
 Rscript final/R/01_build_inputs.R                       # legs (UTC times), decoded weather, study flights
 for h in 720 360 240 120 60 30; do Rscript final/R/02_features_by_horizon.R $h; done
 Rscript final/R/02_features_by_horizon.R 120 check      # 2 h features equal the midway features exactly
-Rscript final/R/03_fit_by_horizon.R keep                # flights complete at every prediction time
-for h in 720 360 240 120 60 30; do Rscript final/R/03_fit_by_horizon.R $h; done
-Rscript final/R/04_evaluate_horizons.R                  # tables, bootstrap CIs, figures
+Rscript final/R/03_fit_by_horizon.R keep                # flight lists: all_flights and regular
+for pop in regular all_flights; do
+  for h in 720 360 240 120 60 30; do Rscript final/R/03_fit_by_horizon.R $h $pop; done
+  Rscript final/R/04_evaluate_horizons.R 1000 $pop      # tables, bootstrap CIs, figures
+done
+Rscript final/R/05_compare_populations.R                # main vs sensitivity
+Rscript final/R/90_audit_checks.R                       # leakage / consistency checks
 ```
 
-`final/data/` is git-ignored (rebuilt by 01–02); predictions and results are in `final/results/`.
+`final/data/` is git-ignored (rebuilt by 01–02). Results: `final/results/regular/` (**main**: flights with a
+regular recorded aircraft rotation, about 2.6% probable aircraft swaps removed from training and evaluation)
+and `final/results/all_flights/` (sensitivity: every eligible flight).
 
 ## Design
 
@@ -29,30 +35,29 @@ Rscript final/R/04_evaluate_horizons.R                  # tables, bootstrap CIs,
   legs (usually aircraft swaps) are skipped. At c take the latest known state — previous leg landed
   (arrival delay), in the air (departure delay), or an earlier leg known when the previous one has not
   departed — and project the delay forward through the remaining scheduled turns (minimum turn 30 min).
+- **Population**: main = regular recorded rotations; sensitivity = all flights (see audit).
 - **Feature sets**: `base` (midway clean predictors), `prev1` (previous leg only, no look-back),
   `rotation` (full chain), and at 2 h an `oracle` that adds the previous leg's final arrival (not available).
 - **Models**: logistic regression; random forest with the clean settings tuned at 2 h (mtry 3, node 300).
 
-## Key validation results (`horizon_results.md`)
+## Key validation results (`results/regular/horizon_results.md`)
 
-> **Audit caveat (2026-11-11, `results/audit_report.md`):** 2.6% of flights have irregular recorded
-> rotations (aircraft swaps, delay rate 0.68). They inflate the rotation gains, mostly at long horizons
-> (LR at 12 h: 0.049 → 0.014 on regular-rotation flights; at 2 h: 0.156 → 0.144). The numbers below are
-> all-flights results; the final analysis will use regular-rotation flights as the main specification.
+Main population: regular recorded rotations (80,509 validation flights, delay rate 0.267). Probable aircraft
+swaps (irregular rotations) carry post-cutoff information (audit, `results/audit_report.md`) and are
+excluded from training and evaluation for every feature set.
 
-
-- Rotation features at 2 h: AP 0.472 → 0.628 (LR), 0.483 → 0.640 (RF); they recover about 77% of the gain
-  an oracle with the previous leg's final arrival would give.
-- Performance rises steadily as the prediction moves closer to departure (RF with rotation: 0.488 at 12 h,
-  0.640 at 2 h, 0.693 at 30 min).
-- Looking further back along the chain matters at long horizons (+0.016 to +0.028 AP for LR at 4–12 h)
-  and not at ≤ 2 h, where the previous leg's status is almost always known.
-
-- Brier improves the same way (RF with rotation: 0.184 at 12 h, 0.159 at 2 h, 0.145 at 30 min; constant
-  reference 0.208). All models under-predict the validation delay rate (seasonal shift: training 0.202,
-  validation 0.280): LR by 3-5 points with slope near 1; RF by about 2 points but with calibration slope
-  about 1.4, i.e. its probabilities are too conservative (shrunk toward the mean). An intercept shift changes
-  Brier by at most 0.002, so most of the remaining error is not a level shift. See `horizon_calibration.csv`.
+- Rotation features at 2 h: AP 0.456 → 0.604 (LR), 0.469 → 0.619 (RF); Brier 0.180 → 0.157. An oracle
+  with the previous leg's final arrival reaches 0.651 / 0.666, so legal rotation information recovers about
+  75% of that gain.
+- AP of the RF with rotation features: 0.446 (12 h), 0.477 (6 h), 0.533 (4 h), 0.619 (2 h), 0.653 (1 h),
+  0.675 (30 min). The steepest rise is between 4 h and 2 h, when most previous legs go from "not departed"
+  to "in the air".
+- At long horizons almost all of the rotation gain comes from looking further back along the chain: at 12 h
+  the previous-leg-only version adds 0.002 AP (LR) while the full chain adds 0.024.
+- Sensitivity (all flights): gains are larger at long horizons (LR at 12 h: 0.049) because they include the
+  swap leakage; at ≤ 2 h they differ by at most 0.01 (`results/population_comparison.csv`).
+- Calibration: all models under-predict the validation delay rate (seasonal shift); RF probabilities are too
+  conservative (calibration slope about 1.4). See `horizon_calibration.csv`.
 
 ## Assumptions to report
 
@@ -71,7 +76,7 @@ finally operated the flight; at long horizons the planned aircraft may differ, s
    rotation features and DepDelay overlap; report this as a finding.
 3. **Calibration**: try Platt scaling / isotonic recalibration for RF (fit the calibration on May-Jun,
    refit the model on Jan-Jun, apply to test). Report AP and Brier together.
-4. **Sensitivity / audit fixes**: main rotation analysis on regular-rotation flights (refit, all feature sets);
-   all-flights version and same-day-legs-only as sensitivities; 7-day-block bootstrap; exclude a flight from its
-   own same-day count; use DepDelay for >22 h delays (see `results/audit_report.md`).
+4. **Sensitivity / audit fixes**: done — main rotation analysis on regular-rotation flights (refit, all feature
+   sets), all-flights version kept as sensitivity. Still to do: same-day-legs-only sensitivity; 7-day-block
+   bootstrap; exclude a flight from its own same-day count; use DepDelay for >22 h delays.
 5. Freeze all settings, refit on Jan-Jun, evaluate once on the Jul-Sep test period.

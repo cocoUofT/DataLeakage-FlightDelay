@@ -2,7 +2,7 @@
 
 Scope: midway analysis (`scripts/`, `results/midway/`, `results/tuning/`) and the final-study extension
 (`final/`). Empirical checks: `final/R/90_audit_checks.R` (outputs `audit_checks.csv`,
-`audit_rotation_gain_regular_only.csv`). All numbers below are validation (May–Jun 2025); the test period
+`audit_rotation_gain_regular_only.csv`; diagnostics use the all-flights fits). All numbers below are validation (May–Jun 2025); the test period
 has not been used by any modelling or evaluation script (only feature-building scripts read test files).
 
 ## Findings, most serious first
@@ -20,6 +20,12 @@ Effect on the rotation gain (AP, rotation − base), all flights → regular-rot
 |---|---|---|---|---|---|---|
 | LR | 0.049 → 0.014 | 0.064 → 0.035 | 0.094 → 0.072 | 0.156 → 0.144 | 0.175 → 0.169 | 0.175 → 0.168 |
 | RF | 0.071 → 0.036 | 0.077 → 0.048 | 0.103 → 0.082 | 0.157 → 0.144 | 0.173 → 0.166 | 0.185 → 0.179 |
+
+**Status (2026-11-11): fixed.** The final-study pipeline now uses regular-rotation flights as the main
+population (excluded from training and evaluation for every feature set; `final/results/regular/`), with the
+all-flights results kept as a sensitivity (`final/results/all_flights/`). After refitting, the rotation gain at
+12 h is 0.024 (LR) / 0.036 (RF), at 2 h 0.148 / 0.150, and the `no_prev` delay rate (0.284) is close to the
+average (0.267). The table above is the earlier evaluation-only estimate (models fitted on all flights).
 
 The gain at ≤ 2 h is robust; at long horizons it is overstated by roughly half or more. The planned
 aircraft cannot be recovered from BTS. **Fix:** in the final study, report the rotation analysis on

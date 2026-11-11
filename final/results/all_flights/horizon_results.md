@@ -1,4 +1,4 @@
-# Final study (extension): prediction time and aircraft rotation — validation May–Jun 2025
+# Final study (extension): prediction time and aircraft rotation — validation May–Jun 2025 — all flights
 
 n = 82,883 validation flights (delay rate 0.280), identical at every prediction time. Bootstrap: 1000 reps over validation days.
 
