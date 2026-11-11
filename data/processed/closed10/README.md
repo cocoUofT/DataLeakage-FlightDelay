@@ -19,7 +19,7 @@ Airports: ATL, ORD, DFW, DEN, LAX, SFO, JFK, SEA, PHX, MCO (PHX does not observe
 | `weather_10airports_2025JanSep.csv.gz` | 75893 | 13 | All IEM routine + special METAR reports, 2024-12-31 to 2025-09-30, **UTC** (`valid`), plus `iata` column |
 | `model_table_dev.csv.gz` | 237,138 | 122 | Final merged dataset for model training and validation (Jan–Jun 2025), combining flight, history, and weather features |
 | `model_table_test.csv.gz` | 122,896 | 122 |Final merged dataset for the test period (Jul–Sep 2025) |
-| `summary_counts.csv` | — | Rows, eligible flights and ArrDel15 rate by month × origin |
+| `summary_counts.csv` | — | - | Rows, eligible flights and ArrDel15 rate by month × origin |
 
 Read in R with `read.csv(gzfile(path))` or `data.table::fread(path)`.
 
