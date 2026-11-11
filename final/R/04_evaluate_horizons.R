@@ -16,7 +16,9 @@ wide <- preds %>% mutate(key = paste(model, set, horizon, sep = "|")) %>% select
 keys <- setdiff(names(wide), c("flight_id", "FlightDate", "ArrDel15"))
 stopifnot(nrow(wide) == nrow(y), !anyNA(wide[keys]))
 yv <- wide$ArrDel15; P <- as.matrix(wide[keys])
-ap_all <- function(idx) vapply(keys, function(k) average_precision(yv[idx], P[idx, k]), 0)
+ap_all <- function(idx) c(vapply(keys, function(k) average_precision(yv[idx], P[idx, k]), 0),
+                          setNames(vapply(keys, function(k) mean((P[idx, k] - yv[idx])^2), 0), paste0("B:", keys)))
+train_rate <- mean(study$ArrDel15[study$split == "train" & study$flight_id %in% keep])
 
 # ---- point estimates + bootstrap over validation days ----
 days <- split(seq_along(yv), wide$FlightDate)
@@ -24,13 +26,20 @@ point <- ap_all(seq_along(yv))
 set.seed(2112)
 reps <- do.call(rbind, mclapply(seq_len(B), function(b) { set.seed(b); ap_all(unlist(days[sample(length(days), replace = TRUE)], use.names = FALSE)) }, mc.cores = CORES))
 parse_key <- function(k) { s <- strsplit(k, "|", fixed = TRUE); tibble(model = sapply(s, `[`, 1), set = sapply(s, `[`, 2), horizon = as.integer(sapply(s, `[`, 3))) }
+bk <- paste0("B:", keys)
 metrics <- parse_key(keys) %>% mutate(
-  AP = point, AP_lo = apply(reps, 2, quantile, .025), AP_hi = apply(reps, 2, quantile, .975),
-  Brier = vapply(keys, function(k) mean((P[, k] - yv)^2), 0), mean_p = colMeans(P), n = length(yv), delay_rate = mean(yv)) %>%
+  AP = point[keys], AP_lo = apply(reps[, keys], 2, quantile, .025), AP_hi = apply(reps[, keys], 2, quantile, .975),
+  Brier = point[bk], Brier_lo = apply(reps[, bk], 2, quantile, .025), Brier_hi = apply(reps[, bk], 2, quantile, .975),
+  mean_p = colMeans(P), n = length(yv), delay_rate = mean(yv),
+  constant_brier = mean((train_rate - yv)^2)) %>%
   arrange(model, set, desc(horizon))
 write_csv(metrics, file.path(FINAL_RES, "horizon_metrics.csv"))
 
-diff_ci <- function(a, b) { d <- reps[, a] - reps[, b]; c(est = point[[a]] - point[[b]], lo = quantile(d, .025, names = FALSE), hi = quantile(d, .975, names = FALSE)) }
+diff_ci <- function(a, b) { d <- reps[, a] - reps[, b]; c(est = point[[a]] - point[[b]], lo = quantile(d, .025, names = FALSE), hi = quantile(d, .975, names = FALSE),
+  # Brier reduction (b minus a: positive = a has lower Brier)
+  b_est = point[[paste0("B:", b)]] - point[[paste0("B:", a)]],
+  b_lo = quantile(reps[, paste0("B:", b)] - reps[, paste0("B:", a)], .025, names = FALSE),
+  b_hi = quantile(reps[, paste0("B:", b)] - reps[, paste0("B:", a)], .975, names = FALSE)) }
 gains <- bind_rows(
   # value of rotation features at each horizon
   expand_grid(model = c("lr", "rf"), horizon = HORIZONS) %>% rowwise() %>%
@@ -46,7 +55,8 @@ gains <- bind_rows(
   # oracle (previous leg's final arrival delay) vs legal rotation features at 2 h
   tibble(model = c("lr", "rf"), horizon = 120L) %>% rowwise() %>%
     mutate(comparison = "oracle - rotation (2h)", v = list(diff_ci(paste(model, "oracle", 120, sep = "|"), paste(model, "rotation", 120, sep = "|")))) %>% ungroup()
-) %>% mutate(ap_diff = sapply(v, `[`, "est"), lo = sapply(v, `[`, "lo"), hi = sapply(v, `[`, "hi")) %>% select(-v)
+) %>% mutate(ap_diff = sapply(v, `[`, "est"), lo = sapply(v, `[`, "lo"), hi = sapply(v, `[`, "hi"),
+         brier_reduction = sapply(v, `[`, "b_est"), brier_lo = sapply(v, `[`, "b_lo"), brier_hi = sapply(v, `[`, "b_hi")) %>% select(-v)
 write_csv(gains, file.path(FINAL_RES, "horizon_gains.csv"))
 
 # ---- rotation state shares and importance ----
@@ -114,6 +124,55 @@ p3 <- ggplot(states %>% mutate(x = hx(horizon), state = factor(state_lab[as.char
        title = "What is known about the inbound aircraft at each prediction time") + theme_viz
 ggsave(file.path(FINAL_RES, "fig_rotation_states.png"), p3, width = 9, height = 4.6, dpi = 200, bg = "white")
 
+
+# ---- calibration (diagnostic) ----
+# calibration-in-the-large = mean prediction - observed rate; slope from logit(y) ~ logit(p) (1 = ideal,
+# < 1 = predictions too extreme); Brier after an intercept-only shift (uses validation outcomes: diagnostic only)
+lg <- function(p) qlogis(pmin(pmax(p, 1e-6), 1 - 1e-6))
+calib <- parse_key(keys) %>% mutate(
+  mean_p = colMeans(P), observed = mean(yv), citl = mean_p - observed,
+  slope = vapply(keys, function(k) unname(coef(glm(yv ~ lg(P[, k]), family = binomial()))[2]), 0),
+  brier = vapply(keys, function(k) mean((P[, k] - yv)^2), 0),
+  brier_shifted = vapply(keys, function(k) { o <- lg(P[, k]); a <- coef(glm(yv ~ 1 + offset(o), family = binomial()))[1]; mean((plogis(o + a) - yv)^2) }, 0)) %>%
+  arrange(model, set, desc(horizon))
+write_csv(calib, file.path(FINAL_RES, "horizon_calibration.csv"))
+bins <- bind_rows(lapply(keys, function(k) { kk <- parse_key(k)
+  tibble(p = P[, k], y = yv) %>% mutate(bin = ntile(p, 10)) %>% group_by(bin) %>%
+    summarise(mean_predicted = mean(p), observed_rate = mean(y), .groups = "drop") %>% bind_cols(kk) }))
+write_csv(bins, file.path(FINAL_RES, "horizon_calibration_bins.csv"))
+
+b_plot <- metrics %>% filter(set %in% c("base", "rotation")) %>%
+  mutate(x = hx(horizon), series = paste0(MODEL[model], ifelse(set == "rotation", " + aircraft rotation", " (midway clean predictors)")))
+p4 <- ggplot(b_plot, aes(x, Brier, color = series, linetype = series, group = series)) +
+  geom_hline(yintercept = unique(metrics$constant_brier), color = "#8f8e88", linetype = "dotted", linewidth = 0.6) +
+  annotate("text", x = hx(720), y = unique(metrics$constant_brier), label = "constant reference (training delay rate)",
+           hjust = 0, vjust = -0.6, size = 3, color = INK) +
+  geom_errorbar(aes(ymin = Brier_lo, ymax = Brier_hi), width = 0, linewidth = 0.5, alpha = 0.6, linetype = "solid", show.legend = FALSE) +
+  geom_line(linewidth = 0.8) + geom_point(size = 2.2) +
+  scale_color_manual(values = c("Logistic regression (midway clean predictors)" = SERIES[["lr"]], "Logistic regression + aircraft rotation" = SERIES[["lr"]],
+                                "Random forest (midway clean predictors)" = SERIES[["rf"]], "Random forest + aircraft rotation" = SERIES[["rf"]])) +
+  scale_linetype_manual(values = c("Logistic regression (midway clean predictors)" = "dashed", "Logistic regression + aircraft rotation" = "solid",
+                                   "Random forest (midway clean predictors)" = "dashed", "Random forest + aircraft rotation" = "solid")) +
+  guides(color = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
+  labs(x = "Prediction time (before scheduled departure)", y = "Brier score (95% CI; lower is better)",
+       title = "Probability accuracy improves the same way as ranking as departure approaches") + theme_viz
+ggsave(file.path(FINAL_RES, "fig_horizon_brier.png"), p4, width = 9.5, height = 5, dpi = 200, bg = "white")
+
+HCOL <- c("12 h" = "#9cc0ee", "2 h" = "#4f8fdc", "30 min" = "#1a4f94")
+c_plot <- bins %>% filter(set == "rotation", horizon %in% c(720, 120, 30)) %>%
+  mutate(h = factor(horizon_label(horizon), levels = names(HCOL)), model = factor(MODEL[model], levels = MODEL))
+p5 <- ggplot(c_plot, aes(mean_predicted, observed_rate, color = h)) +
+  geom_abline(slope = 1, intercept = 0, color = "#b5b4ae", linetype = "dashed", linewidth = 0.4) +
+  geom_line(linewidth = 0.7) + geom_point(size = 2) +
+  facet_wrap(~ model, ncol = 2) + coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  scale_color_manual(values = HCOL, name = "Prediction time") +
+  labs(x = "Mean predicted probability (decile of risk)", y = "Observed delay rate",
+       title = "Calibration of clean models with rotation features",
+       subtitle = sprintf("Validation delay rate %.3f vs training %.3f; points above the line = delays under-predicted.", mean(yv), train_rate),
+       caption = "Points above the dashed line: the model under-predicts delays.") +
+  theme_viz + theme(legend.title = element_text(color = INK))
+ggsave(file.path(FINAL_RES, "fig_horizon_calibration.png"), p5, width = 9, height = 5.2, dpi = 200, bg = "white")
+
 # ---- readable summary ----
 fmt <- function(x, d = 3) formatC(x, format = "f", digits = d)
 t1 <- metrics %>% filter(set != "oracle") %>% mutate(cell = paste0(fmt(AP), " [", fmt(AP_lo), ", ", fmt(AP_hi), "]")) %>%
@@ -121,10 +180,22 @@ t1 <- metrics %>% filter(set != "oracle") %>% mutate(cell = paste0(fmt(AP), " ["
   arrange(desc(horizon)) %>% mutate(horizon = horizon_label(horizon))
 t2 <- gains %>% mutate(cell = paste0(fmt(ap_diff), " [", fmt(lo), ", ", fmt(hi), "]"), model = MODEL[model], horizon = horizon_label(horizon)) %>%
   select(comparison, model, horizon, cell)
+t3 <- metrics %>% filter(set != "oracle") %>% mutate(cell = paste0(fmt(Brier, 4), " [", fmt(Brier_lo, 4), ", ", fmt(Brier_hi, 4), "]")) %>%
+  mutate(col = paste(MODEL[model], set)) %>% select(horizon, col, cell) %>% pivot_wider(names_from = col, values_from = cell) %>%
+  arrange(desc(horizon)) %>% mutate(horizon = horizon_label(horizon))
+t4 <- gains %>% filter(comparison %in% c("rotation - base", "oracle - rotation (2h)")) %>%
+  mutate(cell = paste0(fmt(brier_reduction, 4), " [", fmt(brier_lo, 4), ", ", fmt(brier_hi, 4), "]"), model = MODEL[model], horizon = horizon_label(horizon)) %>%
+  select(comparison, model, horizon, cell)
+t5 <- calib %>% filter(set %in% c("base", "rotation")) %>%
+  transmute(model = MODEL[model], set, horizon = horizon_label(horizon), mean_p = fmt(mean_p), citl = fmt(citl), slope = fmt(slope, 2),
+            brier = fmt(brier, 4), brier_shifted = fmt(brier_shifted, 4))
 md <- function(d) c(paste0("| ", paste(names(d), collapse = " | "), " |"), paste0("|", paste(rep("---", ncol(d)), collapse = "|"), "|"),
                     apply(d, 1, function(r) paste0("| ", paste(r, collapse = " | "), " |")))
 writeLines(c("# Final study (extension): prediction time and aircraft rotation — validation May–Jun 2025", "",
   sprintf("n = %s validation flights (delay rate %.3f), identical at every prediction time. Bootstrap: %d reps over validation days.", format(length(yv), big.mark = ","), mean(yv), B), "",
-  "**AP [95% CI] by prediction time**", "", md(t1), "", "**Paired differences in AP [95% CI]**", "", md(t2)),
+  "**AP [95% CI] by prediction time**", "", md(t1), "", "**Paired differences in AP [95% CI]**", "", md(t2), "",
+  sprintf("**Brier [95%% CI] by prediction time** (constant reference = training delay rate: %.4f)", unique(metrics$constant_brier)), "", md(t3), "",
+  "**Paired Brier reductions [95% CI]** (positive = first model more accurate)", "", md(t4), "",
+  "**Calibration (diagnostic)**: mean prediction, calibration-in-the-large (mean - observed), slope, Brier after intercept shift", "", md(t5)),
   file.path(FINAL_RES, "horizon_results.md"))
 message("done")

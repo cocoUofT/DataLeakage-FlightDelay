@@ -42,6 +42,12 @@ Rscript final/R/04_evaluate_horizons.R                  # tables, bootstrap CIs,
 - Looking further back along the chain matters at long horizons (+0.016 to +0.028 AP for LR at 4–12 h)
   and not at ≤ 2 h, where the previous leg's status is almost always known.
 
+- Brier improves the same way (RF with rotation: 0.184 at 12 h, 0.159 at 2 h, 0.145 at 30 min; constant
+  reference 0.208). All models under-predict the validation delay rate (seasonal shift: training 0.202,
+  validation 0.280): LR by 3-5 points with slope near 1; RF by about 2 points but with calibration slope
+  about 1.4, i.e. its probabilities are too conservative (shrunk toward the mean). An intercept shift changes
+  Brier by at most 0.002, so most of the remaining error is not a level shift. See `horizon_calibration.csv`.
+
 ## Assumptions to report
 
 Departure/arrival events are assumed known as soon as they happen (lag 0). BTS records the aircraft that
