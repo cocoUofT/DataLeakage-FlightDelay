@@ -61,6 +61,8 @@ excluded from training and evaluation for every feature set.
 
 ## Assumptions to report
 
+See `LIMITATIONS.md` for the full list of uncertainty and bias sources.
+
 Departure/arrival events are assumed known as soon as they happen (lag 0). BTS records the aircraft that
 finally operated the flight; at long horizons the planned aircraft may differ, so rotation features at
 12 h / 6 h may be optimistic.
