@@ -8,17 +8,17 @@ Airports: ATL, ORD, DFW, DEN, LAX, SFO, JFK, SEA, PHX, MCO (PHX does not observe
 
 ## Files
 
-| File | Rows | Contents |
-|---|---:|---|
-| `flights_closed10_dev_2025JanJun.csv.gz` | 237,138 | Flights with **origin and destination both** in the 10 airports, Jan–Jun 2025 (train Jan–Apr, validation May–Jun) |
-| `flights_closed10_test_2025JulSep.csv.gz` | 122,896 | Same, Jul–Sep 2025. **Final test period: do not use for fitting, tuning or feature selection.** |
-| `history_10airports_dev_2025JanJun.csv.gz` | 1,945,965 | Any flight with origin **or** destination in the 10 airports (17 columns). Source for historical delay rates. |
-| `history_10airports_test_2025JulSep.csv.gz` | 1,034,586 | Same, Jul–Sep 2025 (outcomes known before a test flight's cutoff may be used for its historical rates). |
-| `history_10airports_pre_2024JulDec.csv.gz` | 2,024,992 | Same, Jul–Dec 2024. **Lookback only**, so January 2025 flights have a full 182-day window. |
-| `features_history_dev.csv.gz` / `features_history_test.csv.gz` | 237,138 / 122,896 | As-of historical and same-day features per study flight; join on `flight_id` (see below). |
-| `weather_10airports_2025JanSep.csv.gz` | ~76,000 | All IEM routine + special METAR reports, 2024-12-31 to 2025-09-30, **UTC** (`valid`), plus `iata` column |
-| `model_table_dev.csv.gz` | 237,138 | Final merged dataset for model training and validation (Jan–Jun 2025), combining flight, history, and weather features |
-| `model_table_test.csv.gz` | 122,896 | Final merged dataset for the test period (Jul–Sep 2025) |
+| File | Rows | Variables | Contents |
+|---|---:|---:|---|
+| `flights_closed10_dev_2025JanJun.csv.gz` | 237,138 | 43 | Flights with **origin and destination both** in the 10 airports, Jan–Jun 2025 (train Jan–Apr, validation May–Jun) |
+| `flights_closed10_test_2025JulSep.csv.gz` | 122,896 | 43 | Same, Jul–Sep 2025. **Final test period: do not use for fitting, tuning or feature selection.** |
+| `history_10airports_dev_2025JanJun.csv.gz` | 1,945,965 | 18 | Any flight with origin **or** destination in the 10 airports (17 columns). Source for historical delay rates. |
+| `history_10airports_test_2025JulSep.csv.gz` | 1,034,586 |18 | Same, Jul–Sep 2025 (outcomes known before a test flight's cutoff may be used for its historical rates). |
+| `history_10airports_pre_2024JulDec.csv.gz` | 2,024,992 | 18 | Same, Jul–Dec 2024. **Lookback only**, so January 2025 flights have a full 182-day window. |
+| `features_history_dev.csv.gz` / `features_history_test.csv.gz` | 237,138 / 122,896 | 30/30 | As-of historical and same-day features per study flight; join on `flight_id` (see below). |
+| `weather_10airports_2025JanSep.csv.gz` | 75893 | 13 | All IEM routine + special METAR reports, 2024-12-31 to 2025-09-30, **UTC** (`valid`), plus `iata` column |
+| `model_table_dev.csv.gz` | 237,138 | 122 | Final merged dataset for model training and validation (Jan–Jun 2025), combining flight, history, and weather features |
+| `model_table_test.csv.gz` | 122,896 | 122 |Final merged dataset for the test period (Jul–Sep 2025) |
 | `summary_counts.csv` | — | Rows, eligible flights and ArrDel15 rate by month × origin |
 
 Read in R with `read.csv(gzfile(path))` or `data.table::fread(path)`.
