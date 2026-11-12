@@ -198,6 +198,36 @@ p3 <- ggplot(calib_bins %>% mutate(model = MODEL_LABEL[model]), aes(mean_predict
                     legend.background = element_rect(fill = alpha("white", 0.9), color = "NA", linewidth = 0.3))
 ggsave(file.path(MIDWAY_DIR, "fig_calibration.png"), p3, width = 6, height = 6, dpi = 300, bg = "white")
 
+
+weather_sub_file <- file.path(MIDWAY_DIR, "weather_subgroups_leakage.csv")
+
+if (file.exists(weather_sub_file)) {
+  subgroups <- read_csv(weather_sub_file, show_col_types = FALSE)
+  
+  subgroups$weather_group <- factor(subgroups$weather_group, levels = c("Severe Weather", "Good Weather"))
+  
+  p4 <- ggplot(subgroups, aes(x = Diff_W_minus_C, y = weather_group)) +
+  
+    geom_vline(xintercept = 0, color = "#737373", linetype = "dashed", linewidth = 0.6) +
+
+    geom_errorbar(aes(xmin = CI_Lower, xmax = CI_Upper), width = 0.15, linewidth = 0.9, color = "#2b8cbe") +
+
+    geom_point(size = 3.5, color = "#2b8cbe") +
+
+    labs(x = "Apparent Gain in Average Precision: W vs. C (95% CI)", 
+         y = "Weather Subgroup",
+         title = "Impact of Weather Leakage Across Meteorological Conditions",
+         subtitle = "Leakage severity varies by subgroup (points further right indicate stronger leakage inflation)") +
+    theme_viz + 
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+      plot.subtitle = element_text(hjust = 0.5, size = 11, color = "#333333"),
+      panel.grid.major.y = element_line(color = "#e6e5e1", linetype = "dotted")
+    )
+  
+  ggsave(file.path(MIDWAY_DIR, "fig_weather_subgroups.png"), p4, width = 9, height = 3.5, dpi = 300, bg = "white")
+}
+
 # ---- 5. readable summary ----
 fmt <- function(x, d = 3) formatC(x, format = "f", digits = d)
 
