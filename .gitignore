@@ -10,3 +10,6 @@
 /data/processed/closed10/midway_split.rds
 /results/tuning/preds/
 /final/data/
+/data/processed/closed10/lag_features.rds
+/data/processed/closed10/lag_events_cache.rds
+/results/lag_sensitivity/preds/
