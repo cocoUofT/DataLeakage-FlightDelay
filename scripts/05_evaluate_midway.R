@@ -122,9 +122,9 @@ wrap_lbl <- function(x) gsub(" \\(", "\n\\(", x)
 
 fig_gain <- paired %>% filter(block_days == 1, contrast != "WO - W") %>%
   mutate(model = factor(MODEL_LABEL[model], levels = rev(MODEL_LABEL[c("lr_full", "lr_lasso", "rf")])),
-         contrast = factor(recode(contrast, "W - C" = "Weather Leakage: AP(W) − AP(C)",
-                                  "WO - C" = "Operational Leakage: AP(WO) − AP(C)"),
-                           levels = c("Weather Leakage: AP(W) − AP(C)", "Operational Leakage: AP(WO) − AP(C)")))
+         contrast = factor(recode(contrast, "W - C" = "Weather Leakage:\nAP(W) − AP(C)",
+                                  "WO - C" = "Weather + Operational Leakage:\nAP(WO) − AP(C)"),
+                           levels = c("Weather Leakage:\nAP(W) − AP(C)", "Weather + Operational Leakage:\nAP(WO) − AP(C)")))
 
 SPAN <- 0.08
 w_lab <- levels(fig_gain$contrast)[1]; wo_lab <- levels(fig_gain$contrast)[2]
